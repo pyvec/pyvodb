@@ -37,6 +37,7 @@ setup_args = dict(
     install_requires=[
         'blessings >= 1.6, < 2.0',
         'sqlalchemy >= 1.0, < 2.0',
+        'PyYAML >= 3.11, < 4.0',
     ],
 
     tests_require=['pytest'],
