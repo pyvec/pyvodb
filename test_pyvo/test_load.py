@@ -1,7 +1,7 @@
 import pytest
 
 from pyvo.load import get_db
-from pyvo.tables import Event
+from pyvo.tables import Event, City
 
 @pytest.fixture(scope='module')
 def db():
@@ -83,3 +83,21 @@ def test_no_time(db):
     query = query.filter(Event.day == 4)
     event = query.one()
     assert event.start_time is None
+
+def test_city(db):
+    """Test that an event has a city"""
+    query = db.query(Event)
+    query = query.filter(Event.year == 2013)
+    query = query.filter(Event.month == 12)
+    query = query.filter(Event.day == 4)
+    event = query.one()
+    assert event.city.name == 'Ostrava'
+
+def test_cities(db):
+    """Test that an event has a city"""
+    query = db.query(City)
+    query = query.filter(City.name == 'Ostrava')
+    city = query.one()
+    assert len(city.events) > 10
+    assert any(e.name == 'Ostravské KinoPyvo' for e in city.events)
+    assert not any(e.name == 'Brněnské Pyvo' for e in city.events)
