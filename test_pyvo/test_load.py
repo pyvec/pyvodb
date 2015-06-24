@@ -122,3 +122,13 @@ def test_venues(db):
     assert venue.events
     assert any(e.name == 'Pražské PyVo' for e in venue.events)
     assert not any(e.name == 'Brněnské Pyvo' for e in venue.events)
+
+def test_urls(db):
+    """Test that an event has URLs"""
+    query = db.query(Event)
+    query = query.filter(Event.year == 2013)
+    query = query.filter(Event.month == 12)
+    query = query.filter(Event.day == 4)
+    event = query.one()
+    [url] = event.urls
+    assert url.url == 'http://lanyrd.com/2013/ostravske-pyvo-druhe/'

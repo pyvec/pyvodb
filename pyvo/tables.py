@@ -43,12 +43,11 @@ class Event(TableBase):
     start_time = Column(
         Time(),
         doc=u"The start time")
-    city_id = Column(ForeignKey('cities.id'))
+    city_id = Column(ForeignKey('cities.id'), nullable=False)
     city = relationship('City', backref=backref('events'))
-    venue_id = Column(ForeignKey('venues.id'))
+    venue_id = Column(ForeignKey('venues.id'), nullable=False)
     venue = relationship('Venue', backref=backref('events'))
     # XXX: Talks
-    # XXX: URLs
 
     @property
     def title(self):
@@ -79,6 +78,8 @@ class Event(TableBase):
         assert self.city.name == info['city']
         if hasattr(info.get('start'), 'time'):
             self.start_time = info.get('start').time()
+        for url in info.get('urls', []):
+            self.urls.append(EventURL(url=url))
         return self
 
 
@@ -149,3 +150,9 @@ class Venue(TableBase):
             longitude=info['location']['longitude'],
             latitude=info['location']['latitude'],
         )
+
+class EventURL(TableBase):
+    __tablename__ = 'event_urls'
+    event_id = Column(ForeignKey('events.id'), primary_key=True, nullable=False)
+    event = relationship('Event', backref=backref('urls'))
+    url = Column(Unicode(), primary_key=True, nullable=False)
