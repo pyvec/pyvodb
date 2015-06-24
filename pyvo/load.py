@@ -7,12 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from . import tables
 
 def load_event(session, info):
-    event = tables.Event(
-        name=info['name'],
-        number=info.get('number'),
-        topic=info.get('topic'),
-        desription=info.get('desription'),
-    )
+    event = tables.Event.from_dict(info)
     session.add(event)
 
 def load_dir(session, directory):
