@@ -147,3 +147,28 @@ def test_talk_titles(db):
         'Lightning Talk: Knihovnička, EuroPython',
         'Lightning talk: Docker Meetup 24. 3.',
         'Lightning talk: PEP 489 draft']
+
+def test_talk_speaker(db):
+    query = db.query(Event)
+    query = query.filter(Event.year == 2013)
+    query = query.filter(Event.month == 12)
+    query = query.filter(Event.day == 4)
+    event = query.one()
+    talk = event.talks[0]
+    assert len(talk.speakers) == 1
+    assert talk.speakers[0].name == 'Petr Viktorin'
+
+def test_talk_speakers(db):
+    query = db.query(Event)
+    query = query.filter(Event.year == 2011)
+    query = query.filter(Event.month == 1)
+    query = query.filter(Event.day == 17)
+    event = query.one()
+    talk = event.talks[0]
+    assert [s.name for s in talk.speakers] == [
+        'Vlada Macek',
+        'Jakub Vysoký',
+        'Almad',
+        'Jiri Barton',
+        'Jirka Vejrazka',
+        'Ales Zoulek']

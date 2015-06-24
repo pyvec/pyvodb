@@ -6,6 +6,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.orderinglist import ordering_list
+from sqlalchemy.ext.associationproxy import association_proxy
 
 metadata = MetaData()
 TableBase = declarative_base(metadata=metadata)
@@ -174,12 +175,55 @@ class Talk(TableBase):
         doc=u"Talk title")
     index = Column(
         Integer(), nullable=False,
-        doc=u"Talk title")
-    event_id = Column(ForeignKey('events.id'), nullable=False)
+        doc=u"Index in order of talks within an event")
+    event_id = Column(ForeignKey('events.id'), nullable=True)
+    talk_speakers = relationship('TalkSpeaker',
+                                 collection_class=ordering_list('index'),
+                                 backref=backref('talk'))
+    speakers = association_proxy('talk_speakers', 'speaker',
+                                 creator=lambda s: TalkSpeaker(speaker=s))
 
     @classmethod
     def from_dict(cls, info, index, db=None):
-        return cls(
+        self = cls(
             title=info['title'],
             index=index,
         )
+        if db:
+            db.add(self)
+        self.speakers = [Speaker.get_or_make(name, db)
+                         for name in info.get('speakers', [])]
+        return self
+
+
+class Speaker(TableBase):
+    __tablename__ = 'speakers'
+    id = Column(
+        Integer, primary_key=True, nullable=False,
+        doc=u"An internal numeric ID")
+    name = Column(
+        Unicode(), nullable=False,
+        doc=u"Name of the venue")
+    talk_speakers = relationship('TalkSpeaker', backref=backref('speaker'))
+    talks = association_proxy('talk_speakers', 'talk',
+                              creator=lambda t: TalkSpeaker(talk=t))
+
+    @classmethod
+    def get_or_make(cls, name, db=None):
+        if db is not None:
+            query = db.query(Speaker).filter(Speaker.name == name)
+            try:
+                return query.one()
+            except NoResultFound:
+                pass
+        return cls(
+            name=name,
+        )
+
+class TalkSpeaker(TableBase):
+    __tablename__ = 'talk_speakers'
+    talk_id = Column(ForeignKey('talks.id'), primary_key=True, nullable=False)
+    speaker_id = Column(ForeignKey('speakers.id'), primary_key=True, nullable=False)
+    index = Column(
+        Integer(), nullable=True,
+        doc=u"Index in order of a talk's speakers")
