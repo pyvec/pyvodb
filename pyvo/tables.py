@@ -1,5 +1,6 @@
 from sqlalchemy import Column, ForeignKey, MetaData, extract
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
+from sqlalchemy.types import Numeric
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
@@ -42,11 +43,10 @@ class Event(TableBase):
     start_time = Column(
         Time(),
         doc=u"The start time")
-    city_id = Column(
-        ForeignKey('cities.name'),
-        doc=u"ID of the event's city")
+    city_id = Column(ForeignKey('cities.id'))
     city = relationship('City', backref=backref('events'))
-    # XXX: Venue
+    venue_id = Column(ForeignKey('venues.id'))
+    venue = relationship('Venue', backref=backref('events'))
     # XXX: Talks
     # XXX: URLs
 
@@ -74,6 +74,7 @@ class Event(TableBase):
             desription=info.get('desription'),
             date=info.get('start'),
             city=City.get_or_make(info['city'], db),
+            venue=Venue.get_or_make(info['venue'], db),
         )
         assert self.city.name == info['city']
         if hasattr(info.get('start'), 'time'):
@@ -101,4 +102,50 @@ class City(TableBase):
                 pass
         return cls(
             name=name,
+        )
+
+
+class Venue(TableBase):
+    u"""A venue to old events in"""
+    __tablename__ = 'venues'
+    id = Column(
+        Integer, primary_key=True, nullable=False,
+        doc=u"An internal numeric ID")
+    name = Column(
+        Unicode(), nullable=False,
+        doc=u"Name of the venue")
+    city = Column(
+        Unicode(), nullable=False,
+        doc=u"City of the venue")
+    address = Column(
+        Unicode(), nullable=True,
+        doc=u"Address of the venue")
+    longitude = Column(
+        Numeric(), nullable=False,
+        doc=u"Longitude of the location")
+    latitude = Column(
+        Numeric(), nullable=False,
+        doc=u"Latitude of the location")
+
+    @classmethod
+    def get_or_make(cls, info, db=None):
+        if db is not None:
+            query = db.query(Venue).filter(Venue.name == info['name'])
+            try:
+                venue = query.one()
+            except NoResultFound:
+                pass
+            else:
+                assert venue.name == info['name']
+                assert venue.city == info['city']
+                # XXX: Address pulled from Lanyrd is unreliable
+                assert venue.longitude == info['location']['longitude']
+                assert venue.latitude == info['location']['latitude']
+                return venue
+        return cls(
+            name=info['name'],
+            city=info['city'],
+            address=info.get('address'),
+            longitude=info['location']['longitude'],
+            latitude=info['location']['latitude'],
         )
