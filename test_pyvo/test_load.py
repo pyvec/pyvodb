@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from pyvo.load import get_db
@@ -5,7 +6,8 @@ from pyvo.tables import Event, City, Venue
 
 @pytest.fixture(scope='module')
 def db():
-    return get_db()
+    directory = os.path.join(os.path.dirname(__file__), 'data')
+    return get_db(directory)
 
 def test_load(db):
     assert db
@@ -98,7 +100,7 @@ def test_cities(db):
     query = db.query(City)
     query = query.filter(City.name == 'Ostrava')
     city = query.one()
-    assert len(city.events) > 10
+    assert city.events
     assert any(e.name == 'Ostravské KinoPyvo' for e in city.events)
     assert not any(e.name == 'Brněnské Pyvo' for e in city.events)
 
@@ -117,6 +119,6 @@ def test_venues(db):
     query = query.filter(Venue.name == 'Na Věnečku')
     query = query.filter(Venue.city == 'Prague')
     venue = query.one()
-    assert len(venue.events) > 10
+    assert venue.events
     assert any(e.name == 'Pražské PyVo' for e in venue.events)
     assert not any(e.name == 'Brněnské Pyvo' for e in venue.events)
