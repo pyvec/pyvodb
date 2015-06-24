@@ -132,3 +132,18 @@ def test_urls(db):
     event = query.one()
     [url] = event.urls
     assert url.url == 'http://lanyrd.com/2013/ostravske-pyvo-druhe/'
+
+def test_talk_titles(db):
+    """Test that an event has some talks"""
+    query = db.query(Event)
+    query = query.filter(Event.year == 2015)
+    query = query.filter(Event.month == 3)
+    query = query.filter(Event.day == 18)
+    event = query.one()
+    assert [t.title for t in event.talks] == [
+        'Docker & Autoscaling',
+        'Optimalizace v Pythonu',
+        'Lightning talk: Django Girls Praha',
+        'Lightning Talk: Knihovnička, EuroPython',
+        'Lightning talk: Docker Meetup 24. 3.',
+        'Lightning talk: PEP 489 draft']

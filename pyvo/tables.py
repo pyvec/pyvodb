@@ -5,6 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.ext.orderinglist import ordering_list
 
 metadata = MetaData()
 TableBase = declarative_base(metadata=metadata)
@@ -47,7 +48,8 @@ class Event(TableBase):
     city = relationship('City', backref=backref('events'))
     venue_id = Column(ForeignKey('venues.id'), nullable=False)
     venue = relationship('Venue', backref=backref('events'))
-    # XXX: Talks
+    talks = relationship('Talk', collection_class=ordering_list('index'),
+                         backref=backref('event'))
 
     @property
     def title(self):
@@ -80,6 +82,8 @@ class Event(TableBase):
             self.start_time = info.get('start').time()
         for url in info.get('urls', []):
             self.urls.append(EventURL(url=url))
+        self.talks = [Talk.from_dict(d, i, db)
+                      for i, d in enumerate(info['talks'])]
         return self
 
 
@@ -151,8 +155,31 @@ class Venue(TableBase):
             latitude=info['location']['latitude'],
         )
 
+
 class EventURL(TableBase):
     __tablename__ = 'event_urls'
     event_id = Column(ForeignKey('events.id'), primary_key=True, nullable=False)
     event = relationship('Event', backref=backref('urls'))
     url = Column(Unicode(), primary_key=True, nullable=False)
+
+
+class Talk(TableBase):
+    u"""A talk"""
+    __tablename__ = 'talks'
+    id = Column(
+        Integer, primary_key=True, nullable=False,
+        doc=u"An internal numeric ID")
+    title = Column(
+        Unicode(), nullable=False,
+        doc=u"Talk title")
+    index = Column(
+        Integer(), nullable=False,
+        doc=u"Talk title")
+    event_id = Column(ForeignKey('events.id'), nullable=False)
+
+    @classmethod
+    def from_dict(cls, info, index, db=None):
+        return cls(
+            title=info['title'],
+            index=index,
+        )
