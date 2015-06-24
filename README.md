@@ -1,22 +1,38 @@
 This tool helps management of Pyvo meetups.
 
 True to the readme-driven development style, this readme describes the
-goals for the next release, not the current state (use --help for that).
+goals for the future, not the current state (use --help for that).
 
 Format example: the file "praha/2014-09-17" could contain:
 
-    name: Pražské PyVo #42
-    start: 2014-09-17 19:00
-    tagline: Python Community Meetup #42 life and everything
-    place: Na Věnečku
+    start: 2014-09-17 19:00:00
+    name: 'Pražské PyVo #42 work&travel'
+    series: Pražské PyVo
+    venue:
+      city: Prague
+      name: Na Věnečku
+      address: "Ostrovského 38a, Praha 5, Czech Republic
+      location:
+        latitude: '50.0678996'
+        longitude: '14.3953814'
     talks:
-    - Maksim Izmaylov: Startup in SF
-    - Honza Král: Zábava s open-source
-    - Aleš Zoulek: Práce u moře
-    links:
-        lanyrd: http://lanyrd.com/2014/praha-pyvo-september/
-    ---
-    Lorem ipsum devel sit achmet
+    - title: Startup in SF
+      speakers:
+      - Maksim Izmaylov
+      urls:
+      - http://lanyrd.com/2014/praha-pyvo-september/sddwfm/
+    - title: Zabava s open-source
+      speakers:
+      - Honza Král
+      urls:
+      - http://lanyrd.com/2014/praha-pyvo-september/sddwfw/
+    - title: Prace u more
+      speakers:
+      - Ales Zoulek
+      urls:
+      - http://lanyrd.com/2014/praha-pyvo-september/sddwgk/
+    urls:
+    - http://lanyrd.com/2014/praha-pyvo-september/
 
 
 Usage:
