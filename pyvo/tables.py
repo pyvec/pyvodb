@@ -1,6 +1,6 @@
 from sqlalchemy import Column, ForeignKey, MetaData, extract
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
-from sqlalchemy.types import Numeric
+from sqlalchemy.types import Numeric, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
@@ -185,6 +185,9 @@ class Talk(TableBase):
                                  backref=backref('talk'))
     speakers = association_proxy('talk_speakers', 'speaker',
                                  creator=lambda s: TalkSpeaker(speaker=s))
+    links = relationship('TalkLink',
+                         collection_class=ordering_list('index'),
+                         backref=backref('talk'))
 
     @classmethod
     def from_dict(cls, info, index, db=None):
@@ -197,6 +200,11 @@ class Talk(TableBase):
             db.add(self)
         self.speakers = [Speaker.get_or_make(name, db)
                          for name in info.get('speakers', [])]
+        for url in info['urls']:
+            self.links.append(TalkLink(url=url, kind='talk'))
+        for coverage in info['coverage']:
+            for kind, url in coverage.items():
+                self.links.append(TalkLink(url=url, kind=kind))
         return self
 
 
@@ -232,3 +240,16 @@ class TalkSpeaker(TableBase):
     index = Column(
         Integer(), nullable=True,
         doc=u"Index in order of a talk's speakers")
+
+
+class TalkLink(TableBase):
+    __tablename__ = 'talk_links'
+    talk_id = Column(ForeignKey('talks.id'), primary_key=True, nullable=False)
+    url = Column(Unicode(), primary_key=True, nullable=False)
+    index = Column(
+        Integer(),
+        doc=u"Index in order of a talk's speakers")
+    kind = Column(
+        Enum('slides', 'video', 'link', 'writeup', 'notes', 'talk'),
+        doc="Kind of the link. 'talk' is a link to the talk itself; "
+            "the rest is for suporting material")

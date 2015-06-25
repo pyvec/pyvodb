@@ -186,3 +186,15 @@ def test_talk_speakers(db):
         'Jiri Barton',
         'Jirka Vejrazka',
         'Ales Zoulek']
+
+def test_talk_links(db):
+    query = db.query(Event)
+    query = query.filter(Event.year == 2013)
+    query = query.filter(Event.month == 5)
+    query = query.filter(Event.day == 30)
+    event = query.one()
+    talk = event.talks[0]
+    assert {s.kind: s.url for s in talk.links} == {
+        'talk': 'http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdm/',
+        'video': 'http://www.youtube.com/watch?v=HDmCGUKfe7Y',
+    }
