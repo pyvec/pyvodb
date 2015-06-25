@@ -156,6 +156,11 @@ class Venue(TableBase):
             latitude=info['location']['latitude'],
         )
 
+    @property
+    def short_address(self):
+        if self.address is not None:
+            return self.address.splitlines()[0]
+
 
 class EventLink(TableBase):
     __tablename__ = 'event_links'
