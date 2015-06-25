@@ -1,6 +1,6 @@
 import re
 
-from sqlalchemy import Column, ForeignKey, MetaData, extract
+from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
 from sqlalchemy.types import Numeric, Enum
 from sqlalchemy.ext.declarative import declarative_base
@@ -58,7 +58,8 @@ class Event(TableBase):
         Time(),
         doc=u"The start time")
     city_id = Column(ForeignKey('cities.id'), nullable=False)
-    city = relationship('City', backref=backref('events'))
+    city = relationship('City', backref=backref('events',
+                                                order_by=desc('date')))
     venue_id = Column(ForeignKey('venues.id'), nullable=False)
     venue = relationship('Venue', backref=backref('events'))
     talks = relationship('Talk', collection_class=ordering_list('index'),

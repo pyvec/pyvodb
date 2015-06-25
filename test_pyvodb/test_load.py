@@ -105,6 +105,14 @@ def test_cities(db):
     assert any(e.name == 'Ostravské KinoPyvo' for e in city.events)
     assert not any(e.name == 'Brněnské Pyvo' for e in city.events)
 
+def test_city_events(db):
+    """Test that an event has a city"""
+    query = db.query(City)
+    query = query.filter(City.slug == 'praha')
+    city = query.one()
+    dates = [e.date for e in city.events]
+    assert dates == sorted(dates, reverse=True)
+
 def test_venue(db):
     """Test that an event has a venue"""
     query = db.query(Event)
