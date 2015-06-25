@@ -100,6 +100,7 @@ def test_cities(db):
     query = db.query(City)
     query = query.filter(City.name == 'Ostrava')
     city = query.one()
+    assert city.slug == 'ostrava'
     assert city.events
     assert any(e.name == 'Ostravské KinoPyvo' for e in city.events)
     assert not any(e.name == 'Brněnské Pyvo' for e in city.events)

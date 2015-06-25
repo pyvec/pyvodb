@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy import Column, ForeignKey, MetaData, extract
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
 from sqlalchemy.types import Numeric, Enum
@@ -7,6 +9,7 @@ from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
+import unidecode
 
 metadata = MetaData()
 TableBase = declarative_base(metadata=metadata)
@@ -19,6 +22,15 @@ def date_property(name):
     def _func(self):
         return extract(name, self.date)
     return _func
+
+
+def slugify(name):
+    """Make a filename-friendly approximation of a string
+
+    The result only uses the characters a-z, 0-9, _, -
+    """
+    decoded = unidecode.unidecode(name).lower()
+    return re.sub('[^a-z0-9_]+', '-', decoded).strip('-')
 
 
 class Event(TableBase):
@@ -97,6 +109,9 @@ class City(TableBase):
     name = Column(
         Unicode(), nullable=False,
         doc=u"Name of the city")
+    slug = Column(
+        Unicode(), nullable=False, unique=True,
+        doc=u"Unique identifier for use in URLs")
 
     @classmethod
     def get_or_make(cls, name, db=None):
@@ -108,6 +123,7 @@ class City(TableBase):
                 pass
         return cls(
             name=name,
+            slug=slugify(name),
         )
 
 
