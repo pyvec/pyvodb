@@ -82,7 +82,7 @@ class Event(TableBase):
         if hasattr(info.get('start'), 'time'):
             self.start_time = info.get('start').time()
         for url in info.get('urls', []):
-            self.urls.append(EventURL(url=url))
+            self.links.append(EventLink(url=url))
         self.talks = [Talk.from_dict(d, i, db)
                       for i, d in enumerate(info['talks'])]
         return self
@@ -157,10 +157,10 @@ class Venue(TableBase):
         )
 
 
-class EventURL(TableBase):
-    __tablename__ = 'event_urls'
+class EventLink(TableBase):
+    __tablename__ = 'event_links'
     event_id = Column(ForeignKey('events.id'), primary_key=True, nullable=False)
-    event = relationship('Event', backref=backref('urls'))
+    event = relationship('Event', backref=backref('links'))
     url = Column(Unicode(), primary_key=True, nullable=False)
 
 
@@ -223,6 +223,7 @@ class Speaker(TableBase):
         return cls(
             name=name,
         )
+
 
 class TalkSpeaker(TableBase):
     __tablename__ = 'talk_speakers'

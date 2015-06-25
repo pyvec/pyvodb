@@ -130,8 +130,8 @@ def test_urls(db):
     query = query.filter(Event.month == 12)
     query = query.filter(Event.day == 4)
     event = query.one()
-    [url] = event.urls
-    assert url.url == 'http://lanyrd.com/2013/ostravske-pyvo-druhe/'
+    [link] = event.links
+    assert link.url == 'http://lanyrd.com/2013/ostravske-pyvo-druhe/'
 
 def test_talk_titles(db):
     """Test that an event has some talks"""
