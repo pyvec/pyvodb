@@ -18,13 +18,14 @@ def load_dir(session, directory):
     session.commit()
     session.flush()
 
-def get_db(directory):
+def get_db(directory, engine=None):
     directories = []
     for dirpath, dirnames, filenames in os.walk(directory):
         dirnames[:] = [d for d in dirnames if not d.startswith('.')]
         directories.extend(os.path.join(directory, dirpath, d)
                            for d in dirnames)
-    engine = create_engine('sqlite://')
+    if engine is None:
+        engine = create_engine('sqlite://')
     tables.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
