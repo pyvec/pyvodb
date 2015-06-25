@@ -48,7 +48,7 @@ class Event(TableBase):
     topic = Column(
         Unicode(), nullable=True,
         doc=u"Topic of the event")
-    desription = Column(
+    description = Column(
         UnicodeText(), nullable=True,
         doc=u"Description of the event")
     date = Column(
@@ -86,7 +86,7 @@ class Event(TableBase):
             name=info['name'],
             number=info.get('number'),
             topic=info.get('topic'),
-            desription=info.get('desription'),
+            description=info.get('description'),
             date=info.get('start'),
             city=City.get_or_make(info['city'], db),
             venue=Venue.get_or_make(info['venue'], db),
