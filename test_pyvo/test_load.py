@@ -143,10 +143,10 @@ def test_talk_titles(db):
     assert [t.title for t in event.talks] == [
         'Docker & Autoscaling',
         'Optimalizace v Pythonu',
-        'Lightning talk: Django Girls Praha',
-        'Lightning Talk: Knihovnička, EuroPython',
-        'Lightning talk: Docker Meetup 24. 3.',
-        'Lightning talk: PEP 489 draft']
+        'Django Girls Praha',
+        'Knihovnička, EuroPython',
+        'Docker Meetup 24. 3.',
+        'PEP 489 draft']
 
 def test_talk_speaker(db):
     query = db.query(Event)
