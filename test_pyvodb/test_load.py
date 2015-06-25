@@ -1,8 +1,8 @@
 import os
 import pytest
 
-from pyvo.load import get_db
-from pyvo.tables import Event, City, Venue
+from pyvodb.load import get_db
+from pyvodb.tables import Event, City, Venue
 
 @pytest.fixture(scope='module')
 def db():

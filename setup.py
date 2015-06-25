@@ -18,11 +18,11 @@ class PyTest(TestCommand):
 
 
 setup_args = dict(
-    name='pyvo',
+    name='pyvodb',
     version='0.0.1',
-    packages=['pyvo'],
+    packages=['pyvodb'],
 
-    description="""Tools for Pyvo meetup organizers""",
+    description="""Database of Pyvo meetups""",
     author='Petr Viktorin',
     author_email='encukou@gmail.com',
     classifiers=[
