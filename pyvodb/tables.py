@@ -63,6 +63,7 @@ class Event(TableBase):
     venue_id = Column(ForeignKey('venues.id'), nullable=False)
     venue = relationship('Venue', backref=backref('events'))
     talks = relationship('Talk', collection_class=ordering_list('index'),
+                         order_by='Talk.index',
                          backref=backref('event'))
 
     @property
@@ -204,11 +205,13 @@ class Talk(TableBase):
     event_id = Column(ForeignKey('events.id'), nullable=True)
     talk_speakers = relationship('TalkSpeaker',
                                  collection_class=ordering_list('index'),
+                                 order_by='TalkSpeaker.index',
                                  backref=backref('talk'))
     speakers = association_proxy('talk_speakers', 'speaker',
                                  creator=lambda s: TalkSpeaker(speaker=s))
     links = relationship('TalkLink',
                          collection_class=ordering_list('index'),
+                         order_by='TalkLink.index',
                          backref=backref('talk'))
 
     @classmethod
