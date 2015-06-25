@@ -121,6 +121,7 @@ def test_venue(db):
     query = query.filter(Event.day == 4)
     event = query.one()
     assert event.venue.name == 'Sport Club'
+    assert event.venue.slug == 'sport-club'
 
 def test_venues(db):
     """Test that a venue has events"""

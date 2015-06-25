@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlparse
 
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
@@ -150,6 +151,9 @@ class Venue(TableBase):
     latitude = Column(
         Numeric(), nullable=False,
         doc=u"Latitude of the location")
+    slug = Column(
+        Unicode(), nullable=False, unique=True,
+        doc=u"Unique identifier for use in URLs")
 
     @classmethod
     def get_or_make(cls, info, db=None):
@@ -172,6 +176,7 @@ class Venue(TableBase):
             address=info.get('address'),
             longitude=info['location']['longitude'],
             latitude=info['location']['latitude'],
+            slug=slugify(info['name']),
         )
 
     @property
@@ -278,3 +283,7 @@ class TalkLink(TableBase):
         Enum('slides', 'video', 'link', 'writeup', 'notes', 'talk'),
         doc="Kind of the link. 'talk' is a link to the talk itself; "
             "the rest is for suporting material")
+
+    @property
+    def hostname(self):
+        return urlparse(self.url).hostname
