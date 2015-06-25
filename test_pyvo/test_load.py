@@ -148,6 +148,20 @@ def test_talk_titles(db):
         'Docker Meetup 24. 3.',
         'PEP 489 draft']
 
+def test_lightning_talks(db):
+    query = db.query(Event)
+    query = query.filter(Event.year == 2015)
+    query = query.filter(Event.month == 3)
+    query = query.filter(Event.day == 18)
+    event = query.one()
+    assert [(t.title, t.is_lightning) for t in event.talks] == [
+        ('Docker & Autoscaling', False),
+        ('Optimalizace v Pythonu', False),
+        ('Django Girls Praha', True),
+        ('Knihovnička, EuroPython', True),
+        ('Docker Meetup 24. 3.', True),
+        ('PEP 489 draft', True)]
+
 def test_talk_speaker(db):
     query = db.query(Event)
     query = query.filter(Event.year == 2013)

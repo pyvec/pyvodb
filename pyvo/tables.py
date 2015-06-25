@@ -176,6 +176,9 @@ class Talk(TableBase):
     index = Column(
         Integer(), nullable=False,
         doc=u"Index in order of talks within an event")
+    is_lightning = Column(
+        Boolean(), nullable=False, default=False,
+        doc=u"True if this is a lightning talk")
     event_id = Column(ForeignKey('events.id'), nullable=True)
     talk_speakers = relationship('TalkSpeaker',
                                  collection_class=ordering_list('index'),
@@ -188,6 +191,7 @@ class Talk(TableBase):
         self = cls(
             title=info['title'],
             index=index,
+            is_lightning=info.get('lightning'),
         )
         if db:
             db.add(self)
