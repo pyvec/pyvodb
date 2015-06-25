@@ -21,6 +21,7 @@ setup_args = dict(
     name='pyvodb',
     version='0.0.1',
     packages=['pyvodb'],
+    url='https://github.com/pyvec/pyvodb',
 
     description="""Database of Pyvo meetups""",
     author='Petr Viktorin',
