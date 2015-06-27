@@ -40,6 +40,7 @@ setup_args = dict(
         'sqlalchemy >= 1.0, < 2.0',
         'PyYAML >= 3.11, < 4.0',
         'unidecode >= 0.04, < 1.0',
+        'python-dateutil >= 2.4.2, <3.0',
     ],
 
     tests_require=['pytest'],

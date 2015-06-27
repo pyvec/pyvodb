@@ -1,5 +1,6 @@
 import re
 from urllib.parse import urlparse
+import datetime
 
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
@@ -11,9 +12,12 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
 import unidecode
+from dateutil import tz
 
 metadata = MetaData()
 TableBase = declarative_base(metadata=metadata)
+
+CET = tz.gettz('Europe/Prague')
 
 def date_property(name):
     @hybrid_property
@@ -77,6 +81,15 @@ class Event(TableBase):
         if self.topic:
             parts.append(self.topic)
         return ' '.join(parts)
+
+    @property
+    def start(self):
+        """The event's start time, as a timezone-aware datetime object"""
+        if self.start_time is None:
+            time = datetime.time(hour=19, tzinfo=CET)
+        else:
+            time = self.start_time.replace(tzinfo=CET)
+        return datetime.datetime.combine(self.date, time)
 
     year = date_property('year')
     month = date_property('month')
