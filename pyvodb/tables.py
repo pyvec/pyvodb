@@ -19,6 +19,10 @@ TableBase = declarative_base(metadata=metadata)
 
 CET = tz.gettz('Europe/Prague')
 
+YOUTUBE_PREFIX = 'http://www.youtube.com/watch?v='
+YOUTUBE_RE = re.compile(re.escape(YOUTUBE_PREFIX) + '([-0-9a-zA-Z_]+)')
+
+
 def date_property(name):
     @hybrid_property
     def _func(self):
@@ -250,6 +254,13 @@ class Talk(TableBase):
                 self.links.append(TalkLink(url=url, kind=kind))
         return self
 
+    @property
+    def youtube_id(self):
+        for link in self.links:
+            yid = link.youtube_id
+            if yid:
+                return yid
+
 
 class Speaker(TableBase):
     __tablename__ = 'speakers'
@@ -300,3 +311,9 @@ class TalkLink(TableBase):
     @property
     def hostname(self):
         return urlparse(self.url).hostname
+
+    @property
+    def youtube_id(self):
+        match = YOUTUBE_RE.match(self.url)
+        if match:
+            return match.group(1)
