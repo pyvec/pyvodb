@@ -1,17 +1,36 @@
 import os
 import pytest
 
-from pyvodb.load import get_db
+from pyvodb.load import get_db, load_from_directory, yield_filenames
+from pyvodb.load import load_from_file
 from pyvodb.tables import Event, City, Venue
 
 @pytest.fixture(scope='module')
-def db():
-    directory = os.path.join(os.path.dirname(__file__), 'data')
-    return get_db(directory)
+def data_directory():
+    return os.path.join(os.path.dirname(__file__), 'data')
+
+@pytest.fixture(scope='module')
+def db(data_directory):
+    return get_db(data_directory)
+
+@pytest.fixture
+def empty_db(data_directory):
+    return get_db(None)
 
 def test_load(db):
     assert db
     assert db.query(Event).first().name
+
+def test_load_twice(db, data_directory):
+    with pytest.raises(ValueError):
+        load_from_directory(db, data_directory)
+
+def test_load_piecewise(empty_db, data_directory):
+    for filename in yield_filenames(data_directory):
+        load_from_file(empty_db, filename)
+    assert empty_db.query(Event).first().name
+
+    test_talk_speakers(empty_db)
 
 def test_title_3part(db):
     """Test title with name, number, and topic"""
@@ -78,13 +97,15 @@ def test_time(db):
     assert event.start_time.second == 0
 
 def test_no_time(db):
-    """Test an event with no start time set"""
+    """Test an event with no start time set in the YAML"""
     query = db.query(Event)
     query = query.filter(Event.year == 2013)
     query = query.filter(Event.month == 12)
     query = query.filter(Event.day == 4)
     event = query.one()
-    assert event.start_time is None
+    assert event.start_time.hour == 19
+    assert event.start_time.minute == 0
+    assert event.start_time.second == 0
 
 def test_city(db):
     """Test that an event has a city"""

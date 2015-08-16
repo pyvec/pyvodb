@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 import datetime
 
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
 from sqlalchemy.types import Enum
 from sqlalchemy.ext.declarative import declarative_base
@@ -21,6 +22,22 @@ CET = tz.gettz('Europe/Prague')
 
 YOUTUBE_PREFIX = 'http://www.youtube.com/watch?v='
 YOUTUBE_RE = re.compile(re.escape(YOUTUBE_PREFIX) + '([-0-9a-zA-Z_]+)')
+
+
+def use_memo(name, fields):
+    def decorator(func):
+        def inner(*args, memo=None, **kwargs):
+            if memo is None:
+                memo = {}
+            values = tuple(kwargs[f] for f in fields)
+            d = memo.setdefault(name, {})
+            try:
+                result = d[values]
+            except:
+                result = d[values] = func(*args, memo=memo, **kwargs)
+            return result
+        return inner
+    return decorator
 
 
 def date_property(name):
@@ -45,6 +62,7 @@ def slugify(name):
 class Event(TableBase):
     u"""An event."""
     __tablename__ = 'events'
+    __table_args__ = (UniqueConstraint('city_id', 'date', 'start_time'),)
     id = Column(
         Integer, primary_key=True, nullable=False,
         doc=u"An internal numeric ID")
@@ -99,26 +117,6 @@ class Event(TableBase):
     month = date_property('month')
     day = date_property('day')
 
-    @classmethod
-    def from_dict(cls, info, db=None):
-        self = cls(
-            name=info['name'],
-            number=info.get('number'),
-            topic=info.get('topic'),
-            description=info.get('description'),
-            date=info.get('start'),
-            city=City.get_or_make(info['city'], db),
-            venue=Venue.get_or_make(info['venue'], db),
-        )
-        assert self.city.name == info['city']
-        if hasattr(info.get('start'), 'time'):
-            self.start_time = info.get('start').time()
-        for url in info.get('urls', []):
-            self.links.append(EventLink(url=url))
-        self.talks = [Talk.from_dict(d, i, db)
-                      for i, d in enumerate(info['talks'])]
-        return self
-
 
 class City(TableBase):
     u"""A city that holds events"""
@@ -132,19 +130,6 @@ class City(TableBase):
     slug = Column(
         Unicode(), nullable=False, unique=True,
         doc=u"Unique identifier for use in URLs")
-
-    @classmethod
-    def get_or_make(cls, name, db=None):
-        if db is not None:
-            query = db.query(City).filter(City.name == name)
-            try:
-                return query.one()
-            except NoResultFound:
-                pass
-        return cls(
-            name=name,
-            slug=slugify(name),
-        )
 
 
 class Venue(TableBase):
@@ -172,30 +157,6 @@ class Venue(TableBase):
         Unicode(), nullable=False, unique=True,
         doc=u"Unique identifier for use in URLs")
 
-    @classmethod
-    def get_or_make(cls, info, db=None):
-        if db is not None:
-            query = db.query(Venue).filter(Venue.name == info['name'])
-            try:
-                venue = query.one()
-            except NoResultFound:
-                pass
-            else:
-                assert venue.name == info['name']
-                assert venue.city == info['city']
-                # XXX: Address pulled from Lanyrd is unreliable
-                assert venue.longitude == info['location']['longitude']
-                assert venue.latitude == info['location']['latitude']
-                return venue
-        return cls(
-            name=info['name'],
-            city=info['city'],
-            address=info.get('address'),
-            longitude=info['location']['longitude'],
-            latitude=info['location']['latitude'],
-            slug=slugify(info['name']),
-        )
-
     @property
     def short_address(self):
         if self.address is not None:
@@ -207,6 +168,9 @@ class EventLink(TableBase):
     event_id = Column(ForeignKey('events.id'), primary_key=True, nullable=False)
     event = relationship('Event', backref=backref('links'))
     url = Column(Unicode(), primary_key=True, nullable=False)
+    index = Column(
+        Integer(),
+        doc=u"Index in order of an event's links")
 
 
 class Talk(TableBase):
@@ -236,24 +200,6 @@ class Talk(TableBase):
                          order_by='TalkLink.index',
                          backref=backref('talk'))
 
-    @classmethod
-    def from_dict(cls, info, index, db=None):
-        self = cls(
-            title=info['title'],
-            index=index,
-            is_lightning=info.get('lightning'),
-        )
-        if db:
-            db.add(self)
-        self.speakers = [Speaker.get_or_make(name, db)
-                         for name in info.get('speakers', [])]
-        for url in info['urls']:
-            self.links.append(TalkLink(url=url, kind='talk'))
-        for coverage in info['coverage']:
-            for kind, url in coverage.items():
-                self.links.append(TalkLink(url=url, kind=kind))
-        return self
-
     @property
     def youtube_id(self):
         for link in self.links:
@@ -274,18 +220,6 @@ class Speaker(TableBase):
     talks = association_proxy('talk_speakers', 'talk',
                               creator=lambda t: TalkSpeaker(talk=t))
 
-    @classmethod
-    def get_or_make(cls, name, db=None):
-        if db is not None:
-            query = db.query(Speaker).filter(Speaker.name == name)
-            try:
-                return query.one()
-            except NoResultFound:
-                pass
-        return cls(
-            name=name,
-        )
-
 
 class TalkSpeaker(TableBase):
     __tablename__ = 'talk_speakers'
@@ -302,7 +236,7 @@ class TalkLink(TableBase):
     url = Column(Unicode(), primary_key=True, nullable=False)
     index = Column(
         Integer(),
-        doc=u"Index in order of a talk's speakers")
+        doc=u"Index in order of a talk's links")
     kind = Column(
         Enum('slides', 'video', 'link', 'writeup', 'notes', 'talk'),
         doc="Kind of the link. 'talk' is a link to the talk itself; "
