@@ -21,7 +21,8 @@ def load_dir(session, directory):
 def get_db(directory, engine=None):
     directories = []
     for dirpath, dirnames, filenames in os.walk(directory):
-        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        dirnames[:] = [d for d in dirnames if (d in ('.', '..') or
+                                               not d.startswith('.'))]
         directories.extend(os.path.join(directory, dirpath, d)
                            for d in dirnames)
     if engine is None:
