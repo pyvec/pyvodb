@@ -4,7 +4,7 @@ import datetime
 
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
-from sqlalchemy.types import Numeric, Enum
+from sqlalchemy.types import Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
@@ -163,10 +163,10 @@ class Venue(TableBase):
         Unicode(), nullable=True,
         doc=u"Address of the venue")
     longitude = Column(
-        Numeric(), nullable=False,
+        Unicode(), nullable=False,
         doc=u"Longitude of the location")
     latitude = Column(
-        Numeric(), nullable=False,
+        Unicode(), nullable=False,
         doc=u"Latitude of the location")
     slug = Column(
         Unicode(), nullable=False, unique=True,
