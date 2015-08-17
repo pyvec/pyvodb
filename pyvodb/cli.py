@@ -38,12 +38,40 @@ def list_cities(header, db):
         print('  ' + city.slug)
 
 
-@click.group(context_settings=CONTEXT_SETTINGS)
+class AliasedGroup(click.Group):
+    """Allow short aliases of commands"""
+    # http://click.pocoo.org/5/advanced/#command-aliases
+    def get_command(self, ctx, cmd_name):
+        rv = super().get_command(ctx, cmd_name)
+        if rv is not None:
+            return rv
+        matches = [x for x in self.list_commands(ctx)
+                   if x.startswith(cmd_name)]
+        if not matches:
+            return None
+        elif len(matches) == 1:
+            cmd = super().get_command(ctx, matches[0])
+            ctx.invoked_subcommand = matches[0]
+            return cmd
+        ctx.fail('Ambiguous command: could be %s' % ', '.join(sorted(matches)))
+
+    def command(self, *args, **kwargs):
+        kwargs.setdefault('cls', Command)
+        return super().command(*args, **kwargs)
+
+
+class Command(click.Command):
+    """Keep original names of commands, even if aliased"""
+    def make_context(self, cmd_name, *args, **kwargs):
+        return super().make_context(self.name, *args, **kwargs)
+
+
+@click.group(context_settings=CONTEXT_SETTINGS, cls=AliasedGroup)
 @click.option('--data', help="Data directory", default='.', envvar='PYVO_DATA')
 @click.option('-v/-q', '--verbose/--quiet')
 @click.pass_context
 def cli(ctx, data, verbose):
-    """Manipulate and query a meetup database
+    """Manipulate and query a meetup database.
     """
     if verbose:
         logging.basicConfig(level=logging.INFO)
@@ -123,7 +151,7 @@ def get_event(db, city_obj, date, now):
 @click.argument('date', required=False)
 @click.pass_context
 def show(ctx, city, date):
-    """Show a particular meetup
+    """Show a particular meetup.
 
     city: The meetup series.
 

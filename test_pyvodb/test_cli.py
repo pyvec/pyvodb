@@ -30,6 +30,18 @@ def test_help(run):
     assert result.output.startswith('Usage: cli [OPTIONS] COMMAND [ARGS]...')
 
 
+def test_show_help(run):
+    result = run('show', '--help')
+    assert result.exit_code == 0
+    assert result.output.startswith('Usage: cli show [OPTIONS] CITY [DATE]')
+
+
+def test_alias_help(run):
+    result = run('sho', '--help')
+    assert result.exit_code == 0
+    assert result.output.startswith('Usage: cli show [OPTIONS] CITY [DATE]')
+
+
 def test_show_now(run, get_yaml_data):
     result = run('show', 'ostrava')
     assert result.exit_code == 0
