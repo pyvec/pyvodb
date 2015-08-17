@@ -5,12 +5,12 @@ import os
 
 import click
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
-import yaml
 import blessings
 
 from pyvodb.load import get_db
 from pyvodb import tables
 from pyvodb.calendar import get_calendar, MONTH_NAMES
+from pyvodb.dumpers import yaml_dump, json_dump
 
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -18,26 +18,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 def main():
     return cli(obj={})
-
-
-class EventDumper(yaml.SafeDumper):
-    def __init__(self, *args, **kwargs):
-        kwargs['default_flow_style'] = False
-        kwargs['allow_unicode'] = True
-        super(EventDumper, self).__init__(*args, **kwargs)
-
-def _dict_representer(dumper, data):
-    return dumper.represent_mapping(
-        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-        data.items())
-
-EventDumper.add_representer(collections.OrderedDict, _dict_representer)
-
-
-def list_cities(header, db):
-    print(header)
-    for city in db.query(tables.City):
-        print('  ' + city.slug)
 
 
 class AliasedGroup(click.Group):
@@ -72,9 +52,11 @@ class Command(click.Command):
 @click.option('--data', help="Data directory", default='.', envvar='PYVO_DATA')
 @click.option('--color/--no-color', default=None,
               help="Enable or disable color output (Default is to only use color for terminals)")
+@click.option('--yaml', 'format', flag_value='yaml', help="Export raw data as JSON")
+@click.option('--json', 'format', flag_value='json', help="Export raw data as YAML")
 @click.option('-v/-q', '--verbose/--quiet')
 @click.pass_context
-def cli(ctx, data, verbose, color):
+def cli(ctx, data, verbose, color, format):
     """Manipulate and query a meetup database.
     """
     if verbose:
@@ -93,6 +75,17 @@ def cli(ctx, data, verbose, color):
             os.environ['PYVO_TEST_NOW'], '%Y-%m-%d %H:%M:%S')
     else:
         ctx.obj['now'] = datetime.datetime.now()
+    ctx.obj['format'] = format
+
+
+def handle_raw_output(ctx, data):
+    """If a raw output format is set, dump data and exit"""
+    if ctx.obj['format'] == 'json':
+        print(json_dump(data))
+        exit(0)
+    if ctx.obj['format'] == 'yaml':
+        print(yaml_dump(data), end='')
+        exit(0)
 
 
 def parse_date(date):
@@ -197,7 +190,10 @@ def show(ctx, city, date):
 
     event = get_event(db, city_obj, date, ctx.obj['now'].date())
 
-    print(yaml.dump(event.as_dict(), Dumper=EventDumper), end='')
+    data = event.as_dict()
+    handle_raw_output(ctx, data)
+
+    print(yaml_dump(data), end='')
 
 
 @cli.command()
@@ -245,11 +241,12 @@ def calendar(ctx, date, agenda, year):
         first_month = month - 1
         num_months = 3
 
-    render_calendar(db, term, year, first_month, num_months, today, agenda)
-
-def render_calendar(db, term, year, first_month, num_months, today=None, agenda=False):
     calendar = get_calendar(db, year, first_month, num_months)
+    handle_raw_output(ctx, list(calendar.values()))
 
+    render_calendar(term, calendar, today, agenda)
+
+def render_calendar(term, calendar, today=None, agenda=False):
     calendar_items = list(calendar.items())
 
     while calendar_items:

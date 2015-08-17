@@ -3,6 +3,7 @@ import pytest
 import textwrap
 
 from click.testing import CliRunner
+import yaml
 
 from pyvodb.cli import cli
 
@@ -211,3 +212,10 @@ def test_calendar_year(run):
         # 27 28 29 30 31        24 25 26 27 28 29 30  29 30 31             #
         #                                                                  #
         """).replace('#', '')
+
+
+def test_calendar_yaml(run):
+    result = run('--yaml', 'calendar')
+    assert result.exit_code == 0
+    output = yaml.safe_load(result.output)
+    assert output[0]
