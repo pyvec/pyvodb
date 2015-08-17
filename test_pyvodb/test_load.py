@@ -6,10 +6,6 @@ from pyvodb.load import load_from_file
 from pyvodb.tables import Event, City, Venue
 
 @pytest.fixture(scope='module')
-def data_directory():
-    return os.path.join(os.path.dirname(__file__), 'data')
-
-@pytest.fixture(scope='module')
 def db(data_directory):
     return get_db(data_directory)
 

@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse
 import datetime
+import collections
 
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy import UniqueConstraint
@@ -116,6 +117,42 @@ class Event(TableBase):
     year = date_property('year')
     month = date_property('month')
     day = date_property('day')
+
+    def as_dict(self):
+        venue_info = collections.OrderedDict()
+        venue_info['city'] = self.venue.city
+        venue_info['name'] = self.venue.name
+        if self.venue.address is not None:
+            venue_info['address'] = self.venue.address
+        venue_info['location'] = collections.OrderedDict()
+        venue_info['location']['latitude'] = self.venue.latitude
+        venue_info['location']['longitude'] = self.venue.longitude
+
+        talks = []
+        for talk in self.talks:
+            talk_info = collections.OrderedDict()
+            talks.append(talk_info)
+            talk_info['title'] = talk.title
+            if talk.is_lightning:
+                talk_info['lightning'] = True
+            talk_info['speakers'] = [s.name for s in talk.speakers]
+            talk_info['urls'] = [l.url for l in talk.links if l.kind == 'talk']
+            talk_info['coverage'] = [{l.kind: l.url} for l in talk.links if l.kind != 'talk']
+
+        result = collections.OrderedDict()
+        result['city'] = self.city.name
+        result['start'] = datetime.datetime.combine(self.date, self.start_time)
+        result['name'] = self.name
+        if self.number is not None:
+            result['number'] = self.number
+        if self.topic is not None:
+            result['topic'] = self.topic
+        if self.description is not None:
+            result['description'] = self.description
+        result['venue'] = venue_info
+        result['talks'] = talks
+        result['urls'] = [l.url for l in self.links]
+        return result
 
 
 class City(TableBase):

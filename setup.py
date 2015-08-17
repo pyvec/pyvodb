@@ -41,10 +41,17 @@ setup_args = dict(
         'PyYAML >= 3.11, < 4.0',
         'unidecode >= 0.04, < 1.0',
         'python-dateutil >= 2.4.2, <3.0',
+        'click >= 4.1, <5.0',
     ],
 
     tests_require=['pytest'],
     cmdclass={'test': PyTest},
+
+    entry_points={
+        'console_scripts': [
+            'pyvo=pyvodb.cli:main',
+        ],
+    },
 )
 
 
