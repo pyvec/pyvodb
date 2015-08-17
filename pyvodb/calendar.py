@@ -10,8 +10,8 @@ from pyvodb import tables
 DAY = datetime.timedelta(days=1)
 WEEK = DAY * 7
 
-MONTH_NAMES = ('? Leden Únor Březen Duben Květen Červen Červenec Srpen Září '
-    'Říjen Listopad Prosinec').split()
+MONTH_NAMES = ('? January February March April May June July August September '
+    'October November December').split()
 
 
 def get_calendar(db, first_year=None, first_month=None, num_months=3):

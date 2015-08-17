@@ -62,6 +62,7 @@ def cli(ctx, data, verbose, color, format):
     if verbose:
         logging.basicConfig(level=logging.INFO)
         logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    ctx.obj['datadir'] = data
     ctx.obj['db'] = get_db(data)
     if color is None:
         ctx.obj['term'] = blessings.Terminal()
@@ -203,7 +204,7 @@ def show(ctx, city, date):
 @click.argument('date', required=False)
 @click.pass_context
 def calendar(ctx, date, agenda, year):
-    """Show a 3-month calendar of meetups
+    """Show a 3-month calendar of meetups.
 
     \b
     date: The date around which the calendar is centered. May be:
@@ -260,7 +261,7 @@ def render_calendar(term, calendar, today=None, agenda=False):
             print('{0:04}-{1:02}'.format(year, month).center(7*3+1), end='')
         print()
 
-        print(' Po Út St Čt Pá So Ne ' * len(calendar_keys))
+        print(term.blue(' Mo Tu We Th Fr Sa Su ' * len(calendar_keys)))
         next_sepchar = ' '
         for weeks in zip(*calendar_values[:3]):
             for week in weeks:
@@ -273,8 +274,10 @@ def render_calendar(term, calendar, today=None, agenda=False):
                     else:
                         if day['day'] == today:
                             color = term.bold
+                            if day['holiday'] or day['weekend']:
+                                color = term.bold_blue
                         elif day['holiday'] or day['weekend']:
-                            color = term.dim
+                            color = term.blue
                         if day['events']:
                             count = len(day['events'])
                             if count > 1:
