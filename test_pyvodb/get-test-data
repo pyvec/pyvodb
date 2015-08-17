@@ -20,6 +20,7 @@ for name in """
         brno/2013-05-30-gui.yaml
         brno/2015-02-26-dokumentacni.yaml
         brno/2014-02-27-vyjezdove.yaml
+        brno/2012-11-29-cli.yaml
         praha/2015-05-20-anniversary.yaml
         praha/2015-03-18-zase-docker.yaml
         praha/2011-01-17.yaml

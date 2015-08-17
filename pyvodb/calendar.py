@@ -12,7 +12,7 @@ WEEK = DAY * 7
 
 MONTH_NAMES = ('? January February March April May June July August September '
     'October November December').split()
-
+DAY_NAMES = 'Monday Tuesday Wednesday Thursday Friday Saturday Sunday'.split()
 
 def get_calendar(db, first_year=None, first_month=None, num_months=3):
     if first_year is None:

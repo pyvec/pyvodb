@@ -242,3 +242,12 @@ def test_talk_link_youtube_id(db):
     event = query.one()
     talk = event.talks[0]
     assert [s.youtube_id for s in talk.links] == [None, 'HDmCGUKfe7Y']
+
+def test_talk_description(db):
+    query = db.query(Event)
+    query = query.filter(Event.year == 2015)
+    query = query.filter(Event.month == 4)
+    query = query.filter(Event.day == 15)
+    event = query.one()
+    assert event.talks[1].description.startswith(
+        'Modelling API in Rest API Markup Language.\n')

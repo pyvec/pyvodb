@@ -45,9 +45,35 @@ def test_alias_help(run):
 
 
 def test_show_now(run, get_yaml_data):
-    result = run('show', 'ostrava')
+    result = run('show', 'brno', now='2012-11-29 12:00:00')
     assert result.exit_code == 0
-    assert result.output == get_yaml_data('ostrava/2014-08-07*.yaml')
+    assert result.output == textwrap.dedent("""\
+        2012-11-29 (Thursday, November 29, 2012) we're meeting at the Brno meetup
+
+          Brněnské PyVo – CLI
+
+            Python v příkazové řádce: od zpracování argumentů po barevné tabulky
+
+        at U Dřeváka, Dřevařská 22, 602 00, Brno
+          49.209095 N, 16.6008957 E
+          http://mapy.cz/zakladni?x=16.6008957&y=49.209095&z=17
+
+        Talks:
+          Tomáš Ehrlich: Docopt
+              Něco o docopt + malé shrnutí (arg|opt)parse
+            http://lanyrd.com/2012/pyvo-november/sztmf/
+            https://github.com/elvard/talks/blob/master/2012/2012-11-29-pyvo-cli/2012-11-29-pyvo-cli.pdf?raw=true
+            https://github.com/elvard/talks/tree/master/2012/2012-11-29-pyvo-cli
+            [>] http://www.youtube.com/watch?v=4AV7NyQj9ZY
+
+          Petr Viktorin: Textová rozhraní
+            http://lanyrd.com/2012/pyvo-november/scbfhh/
+            https://github.com/encukou/slides/tree/master/2012-11-29-pyvo-cli
+            [>] http://www.youtube.com/watch?v=Rzkv2uwjXAU
+
+        More info online:
+          http://lanyrd.com/2012/pyvo-november/
+        """).expandtabs(4)
 
 
 def test_show_no_upcoming(run, get_yaml_data):
@@ -68,7 +94,7 @@ def test_show_no_upcoming(run, get_yaml_data):
     ['ostrava/2013-11-07*.yaml', ('ostrava', '2013-11-07')],
 ])
 def test_show_event(run, get_yaml_data, args, filename):
-    result = run('show',  *args)
+    result = run('--yaml', 'show',  *args)
     assert result.exit_code == 0
     assert result.output == get_yaml_data(filename)
 

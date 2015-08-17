@@ -246,6 +246,7 @@ def load_talks(db, infos, event_ids, city_ids):
             'index': index,
             'is_lightning': talk_info.get('lightning', False),
             'event_id': event_info['_id'],
+            'description': talk_info.get('description'),
         }
 
     return bulk_load(

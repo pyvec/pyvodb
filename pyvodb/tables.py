@@ -138,6 +138,8 @@ class Event(TableBase):
             talk_info['speakers'] = [s.name for s in talk.speakers]
             talk_info['urls'] = [l.url for l in talk.links if l.kind == 'talk']
             talk_info['coverage'] = [{l.kind: l.url} for l in talk.links if l.kind != 'talk']
+            if talk.description:
+                talk_info['description'] = talk.description
 
         result = collections.OrderedDict()
         result['city'] = self.city.name
@@ -222,6 +224,9 @@ class Talk(TableBase):
     index = Column(
         Integer(), nullable=False,
         doc=u"Index in order of talks within an event")
+    description = Column(
+        UnicodeText(), nullable=True,
+        doc=u"Description of the talk")
     is_lightning = Column(
         Boolean(), nullable=False, default=False,
         doc=u"True if this is a lightning talk")
