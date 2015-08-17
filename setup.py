@@ -42,6 +42,8 @@ setup_args = dict(
         'unidecode >= 0.04, < 1.0',
         'python-dateutil >= 2.4.2, <3.0',
         'click >= 4.1, <5.0',
+        'czech-holidays',
+        'blessings >= 1.6, < 2.0',
     ],
 
     tests_require=['pytest'],

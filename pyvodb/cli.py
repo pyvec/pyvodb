@@ -6,9 +6,11 @@ import os
 import click
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 import yaml
+import blessings
 
 from pyvodb.load import get_db
 from pyvodb import tables
+from pyvodb.calendar import get_calendar, MONTH_NAMES
 
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -68,15 +70,23 @@ class Command(click.Command):
 
 @click.group(context_settings=CONTEXT_SETTINGS, cls=AliasedGroup)
 @click.option('--data', help="Data directory", default='.', envvar='PYVO_DATA')
+@click.option('--color/--no-color', default=None,
+              help="Enable or disable color output (Default is to only use color for terminals)")
 @click.option('-v/-q', '--verbose/--quiet')
 @click.pass_context
-def cli(ctx, data, verbose):
+def cli(ctx, data, verbose, color):
     """Manipulate and query a meetup database.
     """
     if verbose:
         logging.basicConfig(level=logging.INFO)
         logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     ctx.obj['db'] = get_db(data)
+    if color is None:
+        ctx.obj['term'] = blessings.Terminal()
+    elif color is True:
+        ctx.obj['term'] = blessings.Terminal(force_styling=True)
+    elif color is False:
+        ctx.obj['term'] = blessings.Terminal(force_styling=None)
     if 'PYVO_TEST_NOW' in os.environ:
         # Fake the current date for testing
         ctx.obj['now'] = datetime.datetime.strptime(
@@ -85,48 +95,61 @@ def cli(ctx, data, verbose):
         ctx.obj['now'] = datetime.datetime.now()
 
 
+def parse_date(date):
+    if not date:
+        return {'now': True, 'relative': 0}
+    elif date.startswith('p'):
+        num = -int(date[1:])
+        return {'relative': -int(date[1:])}
+    elif date.startswith('+'):
+        num = -int(date[1:])
+        return {'relative': int(date[1:])}
+    elif len(date) == 2:
+        return {'date_based': True, 'month': int(date)}
+    elif len(date) == 4:
+        return {'date_based': True, 'year': int(date)}
+    elif len(date) == 5:
+        target = datetime.datetime.strptime(date, '%y-%m')
+        return {'date_based': True, 'year': target.year, 'month': target.month}
+    elif len(date) == 7:
+        target = datetime.datetime.strptime(date, '%Y-%m')
+        return {'date_based': True, 'year': target.year, 'month': target.month}
+    elif len(date) == 8:
+        target = datetime.datetime.strptime(date, '%y-%m-%d')
+        return {'date_based': True,
+                'year': target.year, 'month': target.month, 'day': target.day}
+    elif len(date) == 10:
+        target = datetime.datetime.strptime(date, '%Y-%m-%d')
+        return {'date_based': True,
+                'year': target.year, 'month': target.month, 'day': target.day}
+    else:
+        return {}
+
+
 def get_event(db, city_obj, date, now):
     query = db.query(tables.Event)
     query = query.filter(tables.Event.city == city_obj)
-    if not date:
+    dateinfo = parse_date(date)
+    if 'now' in dateinfo:
         query = query.filter(tables.Event.date >= now)
         query = query.order_by(tables.Event.date)
         raise_on_many = False
-    elif date.startswith('p'):
-        query = query.filter(tables.Event.date < now)
-        query = query.order_by(tables.Event.date.desc())
-        query = query.offset(int(date[1:]) - 1)
+    elif 'relative' in dateinfo:
+        rel = dateinfo['relative']
+        if rel >= 0:
+            query = query.filter(tables.Event.date >= now)
+            query = query.order_by(tables.Event.date)
+        else:
+            query = query.filter(tables.Event.date < now)
+            query = query.order_by(tables.Event.date.desc())
+        query = query.offset(abs(rel) - 1)
         raise_on_many = False
-    elif date.startswith('+'):
-        query = query.filter(tables.Event.date >= now)
-        query = query.order_by(tables.Event.date)
-        query = query.offset(int(date[1:]) - 1)
-        raise_on_many = False
-    elif len(date) == 2:
-        query = query.filter(tables.Event.year == now.year)
-        query = query.filter(tables.Event.month == int(date))
-        raise_on_many = True
-    elif len(date) == 5:
-        target = datetime.datetime.strptime(date, '%y-%m')
-        query = query.filter(tables.Event.year == target.year)
-        query = query.filter(tables.Event.month == target.month)
-        raise_on_many = True
-    elif len(date) == 7:
-        target = datetime.datetime.strptime(date, '%Y-%m')
-        query = query.filter(tables.Event.year == target.year)
-        query = query.filter(tables.Event.month == target.month)
-        raise_on_many = True
-    elif len(date) == 8:
-        target = datetime.datetime.strptime(date, '%y-%m-%d')
-        query = query.filter(tables.Event.year == target.year)
-        query = query.filter(tables.Event.month == target.month)
-        query = query.filter(tables.Event.day == target.day)
-        raise_on_many = True
-    elif len(date) == 10:
-        target = datetime.datetime.strptime(date, '%Y-%m-%d')
-        query = query.filter(tables.Event.year == target.year)
-        query = query.filter(tables.Event.month == target.month)
-        query = query.filter(tables.Event.day == target.day)
+    elif 'date_based' in dateinfo:
+        query = query.filter(tables.Event.year == dateinfo.get('year', now.year))
+        if 'month' in dateinfo:
+            query = query.filter(tables.Event.month == dateinfo['month'])
+        if 'day' in dateinfo:
+            query = query.filter(tables.Event.day == dateinfo['day'])
         raise_on_many = True
     else:
         raise click.UsageError('Unknown date format')
@@ -175,3 +198,119 @@ def show(ctx, city, date):
     event = get_event(db, city_obj, date, ctx.obj['now'].date())
 
     print(yaml.dump(event.as_dict(), Dumper=EventDumper), end='')
+
+
+@cli.command()
+@click.option('--agenda/--no-agenda', default=None,
+              help='Show a list of events appearing in the calendar.')
+@click.option('-y', '--year', help='Show the whole year', is_flag=True)
+@click.argument('date', required=False)
+@click.pass_context
+def calendar(ctx, date, agenda, year):
+    """Show a 3-month calendar of meetups
+
+    \b
+    date: The date around which the calendar is centered. May be:
+        - YYYY-MM-DD, YY-MM-DD, YYYY-MM or YY-MM (e.g. 2015-08)
+        - MM (e.g. 08): the given month in the current year
+        - pN (e.g. p1): N-th last month
+        - +N (e.g. +2): N-th next month
+        - Omitted: today
+        - YYYY: Show the entire year, as with -y
+    """
+    do_full_year = year
+    today = ctx.obj['now'].date()
+    db = ctx.obj['db']
+    term = ctx.obj['term']
+
+    date_info = parse_date(date)
+    if 'relative' in date_info:
+        year = today.year
+        month = today.month + date_info['relative']
+    elif 'date_based' in date_info:
+        year = date_info.get('year', today.year)
+        month = date_info.get('month', today.month)
+        if 'month' not in date_info and 'day' not in date_info:
+            do_full_year = True
+    else:
+        raise click.UsageError('Unknown date format')
+
+    if agenda is None:
+        agenda = not do_full_year
+
+    if do_full_year:
+        first_month = 1
+        num_months = 12
+    else:
+        first_month = month - 1
+        num_months = 3
+
+    render_calendar(db, term, year, first_month, num_months, today, agenda)
+
+def render_calendar(db, term, year, first_month, num_months, today=None, agenda=False):
+    calendar = get_calendar(db, year, first_month, num_months)
+
+    calendar_items = list(calendar.items())
+
+    while calendar_items:
+        calendar_keys = [k for k, v in calendar_items[:3]]
+        calendar_values = [v for k, v in calendar_items[:3]]
+
+        for year, month in calendar_keys:
+            print(MONTH_NAMES[month].center(7*3+1), end='')
+        print()
+        for year, month in calendar_keys:
+            print('{0:04}-{1:02}'.format(year, month).center(7*3+1), end='')
+        print()
+
+        print(' Po Út St Čt Pá So Ne ' * len(calendar_keys))
+        next_sepchar = ' '
+        for weeks in zip(*calendar_values[:3]):
+            for week in weeks:
+                for day in week:
+                    sepchar = next_sepchar
+                    next_sepchar = ' '
+                    color = str
+                    if day['alien']:
+                        representation = '  '
+                    else:
+                        if day['day'] == today:
+                            color = term.bold
+                        elif day['holiday'] or day['weekend']:
+                            color = term.dim
+                        if day['events']:
+                            count = len(day['events'])
+                            if count > 1:
+                                representation = '**'
+                            else:
+                                representation = day['events'][0].city.slug[:2]
+                            color = term.bold_red
+                        else:
+                            representation = str(day['day'].day)
+                        if day['day'] == today:
+                            sepchar = term.bold('[')
+                            next_sepchar = term.bold(']')
+                    print(sepchar + color(representation.rjust(2)), end='')
+                print(end=next_sepchar)
+                next_sepchar = ' '
+            print()
+        calendar_items = calendar_items[3:]
+
+    if agenda:
+        for (year, month), weeks in calendar.items():
+            need_nl = True
+            for week in weeks:
+                for day in week:
+                    if not day['alien']:
+                        for event in day['events']:
+                            if need_nl:
+                                print()
+                                print('{}:'.format(MONTH_NAMES[month]))
+                                need_nl = False
+                            date = event.date
+                            city = event.city.slug
+                            if len(day['events']) > 2:
+                                date = term.bold_red(str(date))
+                            else:
+                                city = term.bold_red(city[:2]) + city[2:].ljust(7)
+                            print('{} {} {}'.format(city, date, event.title))
