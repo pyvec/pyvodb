@@ -48,3 +48,18 @@ class JsonEncoder(json.JSONEncoder):
         elif isinstance(obj, tables.Event):
             return obj.as_dict()
         return super().default(obj)
+
+
+class OrderedLoader(yaml.SafeLoader):
+    pass
+
+def construct_mapping(loader, node):
+    loader.flatten_mapping(node)
+    return collections.OrderedDict(loader.construct_pairs(node))
+
+OrderedLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    construct_mapping)
+
+def yaml_ordered_load(data):
+    return yaml.load(data, OrderedLoader)

@@ -3,15 +3,22 @@ import datetime
 import collections
 import os
 import textwrap
+import subprocess
+import tempfile
+import shlex
+import difflib
+import traceback
+import pathlib
 
 import click
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 import blessings
+import yaml
 
-from pyvodb.load import get_db
+from pyvodb.load import get_db, load_from_infos, slugify
 from pyvodb import tables
 from pyvodb.calendar import get_calendar, MONTH_NAMES, DAY_NAMES
-from pyvodb.dumpers import yaml_dump, json_dump
+from pyvodb.dumpers import yaml_dump, json_dump, yaml_ordered_load
 
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -55,15 +62,18 @@ class Command(click.Command):
               help="Enable or disable color output (Default is to only use color for terminals)")
 @click.option('--yaml', 'format', flag_value='yaml', help="Export raw data as JSON")
 @click.option('--json', 'format', flag_value='json', help="Export raw data as YAML")
-@click.option('-v/-q', '--verbose/--quiet')
+@click.option('--editor', envvar=['PYVO_EDITOR', 'VISUAL', 'EDITOR'],
+              help="Your preferred editor (preferably console-based)")
+@click.option('-v/-q', '--verbose/--quiet', help="Spew lots of information")
 @click.pass_context
-def cli(ctx, data, verbose, color, format):
+def cli(ctx, data, verbose, color, format, editor):
     """Manipulate and query a meetup database.
     """
+    ctx.obj['verbose'] = verbose
     if verbose:
         logging.basicConfig(level=logging.INFO)
         logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
-    ctx.obj['datadir'] = data
+    ctx.obj['datadir'] = os.path.abspath(data)
     ctx.obj['db'] = get_db(data)
     if color is None:
         ctx.obj['term'] = blessings.Terminal()
@@ -78,6 +88,7 @@ def cli(ctx, data, verbose, color, format):
     else:
         ctx.obj['now'] = datetime.datetime.now()
     ctx.obj['format'] = format
+    ctx.obj['editor'] = shlex.split(editor)
 
 
 def handle_raw_output(ctx, data):
@@ -121,9 +132,21 @@ def parse_date(date):
         return {}
 
 
-def get_event(db, city_obj, date, now):
+def get_city(db, slug):
+    try:
+        query = db.query(tables.City)
+        return query.filter(tables.City.slug.startswith(slug)).one()
+    except NoResultFound:
+        raise click.UsageError('No such city: %s' % slug)
+    except MultipleResultsFound:
+        raise click.UsageError('City is not unique: %s' % slug)
+
+
+def get_event(db, city_slug, date, now):
+    city = get_city(db, city_slug)
+
     query = db.query(tables.Event)
-    query = query.filter(tables.Event.city == city_obj)
+    query = query.filter(tables.Event.city == city)
     dateinfo = parse_date(date)
     if 'now' in dateinfo:
         query = query.filter(tables.Event.date >= now)
@@ -185,21 +208,14 @@ def show(ctx, city, date):
     db = ctx.obj['db']
     today = ctx.obj['now'].date()
     term = ctx.obj['term']
-    try:
-        query = db.query(tables.City)
-        city_obj = query.filter(tables.City.slug.startswith(city)).one()
-    except NoResultFound:
-        raise click.UsageError('No such city: %s' % city)
-    except MultipleResultsFound:
-        raise click.UsageError('City is not unique: %s' % city)
 
-    event = get_event(db, city_obj, date, today)
+    event = get_event(db, city, date, today)
 
     data = event.as_dict()
     handle_raw_output(ctx, data)
-    render_event(term, event, today)
+    render_event(term, event, today, verbose=ctx.obj['verbose'])
 
-def render_event(term, event, today):
+def render_event(term, event, today, verbose=False):
     term_width = min(term.width or 70, 70)
     day_diff = (event.date - today).days
     if day_diff == 0:
@@ -252,6 +268,10 @@ def render_event(term, event, today):
         print('More info online:')
         for link in event.links:
             print('  {}'.format(link.url))
+
+    if verbose and event._source:
+        print()
+        print('entry loaded from {}'.format(event._source))
 
 
 def render_event_title(term, event):
@@ -384,3 +404,184 @@ def render_calendar(term, calendar, today=None, agenda=False):
                             else:
                                 city = term.bold_red(city[:2]) + city[2:].ljust(7)
                             print('{} {} {}'.format(city, date, event.title))
+
+
+def event_filename(info):
+    try:
+        get = info.get
+    except AttributeError:
+        return '<not a dict>'
+    parts = []
+    if get('start'):
+        parts.append(str(get('start').date()))
+    if get('topic'):
+        if parts:
+            parts.append('-')
+        parts.append(slugify(get('topic')))
+    if get('city'):
+        parts.insert(0, slugify(get('city')) + '/')
+    parts.append('.yaml')
+    return ''.join(parts)
+
+
+def show_diff(term, a, b, a_filename, b_filename):
+    if a == b:
+        print(term.yellow('No changes!'))
+        print(a)
+        return
+    for line in difflib.unified_diff(
+            a.splitlines(keepends=True),
+            b.splitlines(keepends=True),
+            a_filename, b_filename, n=max(len(a), len(b))):
+        if line.startswith('+'):
+            print(term.green(line), end='')
+        elif line.startswith('-'):
+            print(term.red(line), end='')
+        elif line.startswith('@'):
+            print(term.yellow(line), end='')
+        else:
+            print(line, end='')
+
+
+def ask(term, prompt, options, *, default=None):
+    assert(c == c.lower() for c in options)
+
+    if len(options) == 1:
+        [answer] = options
+        return answer
+
+    menu_options = collections.OrderedDict(options)
+    menu_options.setdefault('?', 'print this help')
+    menu = '[{}]'.format('/'.join(o.upper() if o == default else o
+                                  for o in menu_options))
+    full_prompt = '{} {} '.format(term.blue(prompt), menu)
+
+    while True:
+        answer = input(full_prompt).lower()
+        if answer in options:
+            return answer
+        if not answer and default:
+            return default
+        if answer not in ('?', 'help'):
+            print(term.yellow('Please select one of the options:'))
+        for letter, help in menu_options.items():
+            print('{}: {}'.format(term.yellow(letter), help))
+
+
+@cli.command()
+@click.argument('city')
+@click.argument('date', required=False)
+@click.pass_context
+def edit(ctx, city, date):
+    """Edit a particular meetup.
+
+    city: The meetup series.
+    date: The date. See `pyvo show --help` for format.
+    """
+    db = ctx.obj['db']
+    today = ctx.obj['now'].date()
+    term = ctx.obj['term']
+    editor = ctx.obj['editor']
+    datadir = ctx.obj['datadir']
+
+    previous_event = get_event(db, city, date, today)
+    previous_source = previous_event._source
+
+    previous_dict = previous_event.as_dict()
+    previous_data = yaml_dump(previous_dict)
+
+    current_dict = previous_event.as_dict()
+    current_data = yaml_dump(current_dict)
+
+    fd, temp_filename = tempfile.mkstemp(suffix='.yaml')
+
+    prompt = 'Action?'
+    options = {'e': 'edit'}
+    default = None
+
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(previous_data)
+
+        while True:
+            answer = ask(term, prompt, options, default=default)
+            options['q'] = 'quit'
+
+            if answer == 'e':
+                subprocess.check_call(editor + [temp_filename])
+            elif answer == 'y':
+                db.commit()
+                prev_src_path = pathlib.Path(previous_source)
+                if pathlib.Path(datadir) in prev_src_path.parents:
+                    prev_src_path.unlink()
+                new_path = os.path.join(datadir, event_filename(current_dict))
+                with open(new_path, 'w') as f:
+                    f.write(current_data)
+                db.commit()
+                break
+            elif answer == 'q':
+                print(term.yellow('The file you are abandoning:'))
+                print(yaml_dump(current_dict))
+                return
+            elif answer == 'i':
+                import code
+                code.interact(local=locals())
+                continue
+            elif answer == 't':
+                traceback.print_exception(type(saved_error), saved_error,
+                                          saved_error.__traceback__)
+                continue
+            else:
+                continue
+
+            db.rollback()
+            with open(temp_filename) as f:
+                current_data = f.read()
+
+            prompt = 'Action?'
+            options = collections.OrderedDict()
+            default = None
+
+            try:
+                phase = 'loading YAML'
+                current_dict = yaml_ordered_load(current_data)
+                current_data = yaml_dump(current_dict)
+
+                show_diff(term, previous_data, current_data,
+                          event_filename(previous_dict),
+                          event_filename(current_dict))
+
+                phase = 'deleting previous entry'
+                db.delete(previous_event)
+                db.flush()
+
+                phase = 'adding new entry'
+                current_dict['_source'] = os.path.join(
+                    datadir, event_filename(current_dict))
+                load_from_infos(db, [current_dict], commit=False)
+
+            except Exception as e:
+                print(term.red('Error {}'.format(phase)))
+                print('{}: {}'.format(type(e).__name__, e))
+                prompt = 'Re-edit or quit?'
+                options['e'] = 're-edit'
+                options['t'] = 'show error traceback'
+                saved_error = e
+                default = 'e'
+            else:
+                if current_data == previous_data:
+                    prompt = 'Re-edit or quit?'
+                    default = 'e'
+                else:
+                    prompt = 'Save this change?'
+                    options['y'] = 'save entry'
+                    default = 'y'
+
+            options['e'] = 're-edit'
+            # XXX: a debug option to enable this?
+            # options['i'] = 'debug with interactive Python console'
+            options['q'] = 'quit'
+
+    finally:
+        db.rollback()
+        os.unlink(temp_filename)

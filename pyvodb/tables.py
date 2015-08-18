@@ -13,7 +13,6 @@ from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
-import unidecode
 from dateutil import tz
 
 metadata = MetaData()
@@ -51,15 +50,6 @@ def date_property(name):
     return _func
 
 
-def slugify(name):
-    """Make a filename-friendly approximation of a string
-
-    The result only uses the characters a-z, 0-9, _, -
-    """
-    decoded = unidecode.unidecode(name).lower()
-    return re.sub('[^a-z0-9_]+', '-', decoded).strip('-')
-
-
 class Event(TableBase):
     u"""An event."""
     __tablename__ = 'events'
@@ -85,6 +75,9 @@ class Event(TableBase):
     start_time = Column(
         Time(),
         doc=u"The start time")
+    _source = Column(
+        Unicode(), nullable=True,
+        doc=u"File from which the entry was loaded")
     city_id = Column(ForeignKey('cities.id'), nullable=False)
     city = relationship('City', backref=backref('events',
                                                 order_by=desc('date')))
@@ -205,7 +198,7 @@ class Venue(TableBase):
 class EventLink(TableBase):
     __tablename__ = 'event_links'
     event_id = Column(ForeignKey('events.id'), primary_key=True, nullable=False)
-    event = relationship('Event', backref=backref('links'))
+    event = relationship('Event', backref=backref('links', cascade='delete'))
     url = Column(Unicode(), primary_key=True, nullable=False)
     index = Column(
         Integer(),

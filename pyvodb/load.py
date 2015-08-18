@@ -1,11 +1,13 @@
 import os
 import datetime
+import re
 
 import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql.expression import select, and_, or_
+import unidecode
 
 from . import tables
 
@@ -13,6 +15,15 @@ try:
     YAML_SAFE_LOADER = yaml.CSafeLoader
 except AttributeError:
     YAML_SAFE_LOADER = yaml.SafeLoader
+
+
+def slugify(name):
+    """Make a filename-friendly approximation of a string
+
+    The result only uses the characters a-z, 0-9, _, -
+    """
+    decoded = unidecode.unidecode(name).lower()
+    return re.sub('[^a-z0-9_]+', '-', decoded).strip('-')
 
 
 def get_db(directory, engine=None):
@@ -38,12 +49,9 @@ def yield_filenames(directory):
     for dirpath, dirnames, filenames in os.walk(directory):
         dirnames[:] = [d for d in dirnames if (d in ('.', '..') or
                                                not d.startswith('.'))]
-        directories.extend(os.path.join(directory, dirpath, d)
-                           for d in dirnames)
-    for directory in directories:
-        for filename in os.listdir(directory):
+        for filename in filenames:
             if filename.endswith('.yaml'):
-                yield os.path.join(directory, filename)
+                yield os.path.join(dirpath, filename)
 
 
 def load_from_directory(db, directory):
@@ -63,6 +71,7 @@ def load_from_file(db, filename):
 def get_info(filename):
     with open(filename) as f:
         info = yaml.load(f, Loader=YAML_SAFE_LOADER)
+    info['_source'] = os.path.abspath(filename)
     return info
 
 
@@ -85,7 +94,7 @@ def _fixup(infos):
         yield info
 
 
-def load_from_infos(db, infos):
+def load_from_infos(db, infos, commit=True):
     """Load data from a list of info dicts (as loaded from YAML) into database
     """
     # The ORM overhead is too high for this kind of bulk load,
@@ -154,7 +163,11 @@ def load_from_infos(db, infos):
         db.rollback()
         raise
     else:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.expire_all()
+    return set(event_ids.values())
 
 
 def load_cities(db, infos):
@@ -163,7 +176,7 @@ def load_cities(db, infos):
         name = info['city']
         return {
             'name': name,
-            'slug': tables.slugify(name),
+            'slug': slugify(name),
         }
 
     return bulk_load(
@@ -183,7 +196,7 @@ def load_venues(db, infos):
             'address': info.get('address'),
             'longitude': info['location']['longitude'],
             'latitude': info['location']['latitude'],
-            'slug': tables.slugify(info['name']),
+            'slug': slugify(info['name']),
         }
 
     return bulk_load(
@@ -207,6 +220,7 @@ def load_events(db, infos, city_ids, venue_ids):
             'start_time': info['start'].time(),
             'city_id': city_ids[(info['city'], )],
             'venue_id': venue_ids[(info['venue']['name'], )],
+            '_source': info.get('_source'),
         }
         return result
 
