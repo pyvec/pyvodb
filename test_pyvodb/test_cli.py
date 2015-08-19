@@ -8,6 +8,7 @@ import re
 
 from click.testing import CliRunner
 import yaml
+from sqlalchemy.orm.exc import NoResultFound
 
 from pyvodb.cli import cli
 from pyvodb.load import get_db
@@ -342,3 +343,21 @@ def test_edit_interactive_dialog(run, data_directory, tmpdir, monkeypatch,
                         output)
 
     assert output == expected
+
+
+def test_rm(run, data_directory, tmpdir, monkeypatch):
+    monkeypatch.setattr(builtins, 'input', make_fake_input(['y']))
+    p = tmpdir.mkdir("brno").join("_f.yaml")
+    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
+        p.write(f.read())
+    db = get_db(str(tmpdir))
+    result = run('rm', 'brno', '2013-05-30',
+                 datadir=str(tmpdir), db=db)
+
+    assert result.exit_code == 0
+    assert result.output == ''
+
+    assert not p.check()
+
+    with pytest.raises(NoResultFound):
+        db.query(tables.Event).one()

@@ -470,6 +470,13 @@ def ask(term, prompt, options, *, default=None):
             print('{}: {}'.format(term.yellow(letter), help))
 
 
+def remove_source_file(filename, datadir):
+    """Remove the given file, if it's somewhere in the directory datadir"""
+    path = pathlib.Path(filename)
+    if pathlib.Path(datadir) in path.parents:
+        path.unlink()
+
+
 def load_new_entry(db, term, datadir, previous_entry, info):
     """Load a new entry from `info`, pausing for confirmation
 
@@ -513,9 +520,7 @@ def load_new_entry(db, term, datadir, previous_entry, info):
     yield yaml_data
 
     db.commit()
-    prev_src_path = pathlib.Path(previous_source)
-    if pathlib.Path(datadir) in prev_src_path.parents:
-        prev_src_path.unlink()
+    remove_source_file(previous_source, datadir)
     new_path = os.path.join(datadir, event_filename(info))
     try:
         os.makedirs(os.path.dirname(new_path))
@@ -645,3 +650,24 @@ def edit(ctx, city, date, interactive):
     finally:
         db.rollback()
         os.unlink(temp_filename)
+
+
+@cli.command()
+@click.argument('city')
+@click.argument('date', required=False)
+@click.pass_context
+def rm(ctx, city, date):
+    """Remove a particular meetup.
+
+    city: The meetup series.
+    date: The date. See `pyvo show --help` for format.
+    """
+    db = ctx.obj['db']
+    today = ctx.obj['now'].date()
+    datadir = ctx.obj['datadir']
+
+    event = get_event(db, city, date, today)
+    db.delete(event)
+    if event._source:
+        remove_source_file(event._source, datadir)
+    db.commit()
