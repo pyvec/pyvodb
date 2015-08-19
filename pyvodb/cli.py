@@ -9,6 +9,7 @@ import shlex
 import difflib
 import traceback
 import pathlib
+import sys
 
 import click
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
@@ -74,7 +75,8 @@ def cli(ctx, data, verbose, color, format, editor):
         logging.basicConfig(level=logging.INFO)
         logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     ctx.obj['datadir'] = os.path.abspath(data)
-    ctx.obj['db'] = get_db(data)
+    if 'db' not in ctx.obj:
+        ctx.obj['db'] = get_db(data)
     if color is None:
         ctx.obj['term'] = blessings.Terminal()
     elif color is True:
@@ -468,11 +470,72 @@ def ask(term, prompt, options, *, default=None):
             print('{}: {}'.format(term.yellow(letter), help))
 
 
+def load_new_entry(db, term, datadir, previous_entry, info):
+    """Load a new entry from `info`, pausing for confirmation
+
+    Returns an iterator for a two-part loading process:
+    - after a first next(), the session is left with an open transaction
+      that has all the data. All load errors should be raised from this first
+      phase
+    - after a second next(), the DB is comitted, and data files are written out
+
+    :param db: Database session
+    :param term: blessings.Terminal for output. None for silent operation
+    :param datadir: Root directory for data (files outside this aren't modified)
+    :param previous_entry: The previous Event, which will be deleted
+    :param info: Dict with new event info
+    """
+    previous_source = previous_entry._source
+    try:
+        phase = 'sanity check'
+        city = info['city']
+
+        phase = 'rolling back transaction'
+        db.rollback()
+
+        phase = 'loading YAML'
+        yaml_data = yaml_dump(info)
+
+        phase = 'deleting previous entry'
+        db.delete(previous_entry)
+        db.flush()
+
+        phase = 'adding new entry'
+        info['_source'] = os.path.join(
+            datadir, event_filename(info))
+        load_from_infos(db, [info], commit=False)
+        del info['_source']
+
+    except Exception:
+        if term:
+            print(term.red('Error {}'.format(phase)))
+        raise
+
+    yield
+
+    db.commit()
+    prev_src_path = pathlib.Path(previous_source)
+    if pathlib.Path(datadir) in prev_src_path.parents:
+        prev_src_path.unlink()
+    new_path = os.path.join(datadir, event_filename(info))
+    try:
+        os.makedirs(os.path.dirname(new_path))
+    except FileExistsError:
+        pass
+    with open(new_path, 'w') as f:
+        f.write(yaml_data)
+
+    yield  # just so the second next() doesn't raise an exception
+
+
 @cli.command()
 @click.argument('city')
 @click.argument('date', required=False)
+@click.option('-i/-I', '--interactive/--no-interactive', default=None,
+              help='Ask for opions interactively, and edit in editor '
+                   '(default if stdin is a TTY).')
 @click.pass_context
-def edit(ctx, city, date):
+def edit(ctx, city, date, interactive):
     """Edit a particular meetup.
 
     city: The meetup series.
@@ -484,84 +547,53 @@ def edit(ctx, city, date):
     editor = ctx.obj['editor']
     datadir = ctx.obj['datadir']
 
+    if interactive is None:
+        interactive = sys.stdin.isatty()
+
     previous_event = get_event(db, city, date, today)
     previous_source = previous_event._source
+
+    if not interactive:
+        yaml_data = sys.stdin.read()
+        assert yaml_data
+        info = yaml_ordered_load(yaml_data)
+        load_process = load_new_entry(db, term, datadir, previous_event, info)
+        next(load_process)
+        # No confirmation step in non-interactive mode
+        next(load_process)
+        return
 
     previous_dict = previous_event.as_dict()
     previous_data = yaml_dump(previous_dict)
 
-    current_dict = previous_event.as_dict()
-    current_data = yaml_dump(current_dict)
+    def show_current_diff():
+        show_diff(term, previous_data, yaml_data,
+                  previous_source or event_filename(previous_dict),
+                  event_filename(info))
 
     fd, temp_filename = tempfile.mkstemp(suffix='.yaml')
-
-    prompt = 'Action?'
-    options = {'e': 'edit'}
-    default = None
-
     try:
         with os.fdopen(fd, 'w') as f:
             f.write(previous_data)
+        subprocess.check_call(editor + [temp_filename])
 
         while True:
-            answer = ask(term, prompt, options, default=default)
-            options['q'] = 'quit'
-
-            if answer == 'e':
-                subprocess.check_call(editor + [temp_filename])
-            elif answer == 'y':
-                db.commit()
-                prev_src_path = pathlib.Path(previous_source)
-                if pathlib.Path(datadir) in prev_src_path.parents:
-                    prev_src_path.unlink()
-                new_path = os.path.join(datadir, event_filename(current_dict))
-                with open(new_path, 'w') as f:
-                    f.write(current_data)
-                db.commit()
-                break
-            elif answer == 'q':
-                print(term.yellow('The file you are abandoning:'))
-                print(yaml_dump(current_dict))
-                return
-            elif answer == 'i':
-                import code
-                code.interact(local=locals())
-                continue
-            elif answer == 't':
-                traceback.print_exception(type(saved_error), saved_error,
-                                          saved_error.__traceback__)
-                continue
-            else:
-                continue
-
-            db.rollback()
             with open(temp_filename) as f:
-                current_data = f.read()
+                yaml_data = f.read()
 
             prompt = 'Action?'
             options = collections.OrderedDict()
             default = None
 
             try:
-                phase = 'loading YAML'
-                current_dict = yaml_ordered_load(current_data)
-                current_data = yaml_dump(current_dict)
+                info = yaml_ordered_load(yaml_data)
 
-                show_diff(term, previous_data, current_data,
-                          event_filename(previous_dict),
-                          event_filename(current_dict))
+                show_current_diff()
 
-                phase = 'deleting previous entry'
-                db.delete(previous_event)
-                db.flush()
-
-                phase = 'adding new entry'
-                current_dict['_source'] = os.path.join(
-                    datadir, event_filename(current_dict))
-                load_from_infos(db, [current_dict], commit=False)
-
+                load_process = load_new_entry(db, term, datadir,
+                                              previous_event, info)
+                next(load_process)
             except Exception as e:
-                print(term.red('Error {}'.format(phase)))
                 print('{}: {}'.format(type(e).__name__, e))
                 prompt = 'Re-edit or quit?'
                 options['e'] = 're-edit'
@@ -569,7 +601,7 @@ def edit(ctx, city, date):
                 saved_error = e
                 default = 'e'
             else:
-                if current_data == previous_data:
+                if yaml_data == previous_data:
                     prompt = 'Re-edit or quit?'
                     default = 'e'
                 else:
@@ -579,8 +611,39 @@ def edit(ctx, city, date):
 
             options['e'] = 're-edit'
             # XXX: a debug option to enable this?
-            # options['i'] = 'debug with interactive Python console'
+            #options['i'] = 'debug with interactive Python console'
+            options['d'] = 'show current diff'
             options['q'] = 'quit'
+
+            while True:
+                # inner loop for asking; options that don't change contents
+                # of the date (i.e. temp file) should loop here
+                # after a "break" we'll re-read data & show updated diff
+
+                answer = ask(term, prompt, options, default=default)
+
+                if answer == 'e':
+                    subprocess.check_call(editor + [temp_filename])
+                    break
+                elif answer == 'y':
+                    next(load_process)
+                    return
+                elif answer == 'q':
+                    print(term.yellow('The file you are abandoning:'))
+                    print(yaml_data)
+                    return
+                elif answer == 'i':
+                    import code
+                    code.interact(local=locals())
+                    continue
+                elif answer == 'd':
+                    show_current_diff()
+                    continue
+                elif answer == 't':
+                    traceback.print_exception(type(saved_error), saved_error,
+                                              saved_error.__traceback__)
+                else:
+                    continue
 
     finally:
         db.rollback()

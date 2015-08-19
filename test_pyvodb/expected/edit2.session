@@ -1,0 +1,105 @@
+--- $f/brno/_f.yaml
++++ 2013-05-30-gui.yaml
+@@ -1,28 +1,28 @@
+-city: Brno
++
+ start: 2013-05-30 19:00:00
+ name: Brněnské PyVo + BRUG
+ topic: GUI
+ venue:
+   city: Brno
+   name: U Dřeváka
+   address: Dřevařská 22, 602 00
+   location:
+     latitude: '49.209095'
+     longitude: '16.6008957'
+ talks:
+ - title: Python a GTK, Getting Things GNOME!
+   speakers:
+   - Izidor Matušov
+   urls:
+   - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdm/
+   coverage:
+   - video: http://www.youtube.com/watch?v=HDmCGUKfe7Y
+ - title: PySide & Qt
+   speakers:
+   - Petr Viktorin
+   urls:
+   - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdy/
+   coverage:
+   - video: http://www.youtube.com/watch?v=wXwn0_mb62I
+ urls:
+ - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/
+Error sanity check
+KeyError: 'city'
+Re-edit or quit? [E/t/d/q/?] t
+Traceback (most recent call last):
+  File "$c", line 595, in edit
+    next(load_process)
+  File "$c", line 491, in load_new_entry
+    city = info['city']
+KeyError: 'city'
+Re-edit or quit? [E/t/d/q/?] d
+--- $f/brno/_f.yaml
++++ 2013-05-30-gui.yaml
+@@ -1,28 +1,28 @@
+-city: Brno
++
+ start: 2013-05-30 19:00:00
+ name: Brněnské PyVo + BRUG
+ topic: GUI
+ venue:
+   city: Brno
+   name: U Dřeváka
+   address: Dřevařská 22, 602 00
+   location:
+     latitude: '49.209095'
+     longitude: '16.6008957'
+ talks:
+ - title: Python a GTK, Getting Things GNOME!
+   speakers:
+   - Izidor Matušov
+   urls:
+   - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdm/
+   coverage:
+   - video: http://www.youtube.com/watch?v=HDmCGUKfe7Y
+ - title: PySide & Qt
+   speakers:
+   - Petr Viktorin
+   urls:
+   - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdy/
+   coverage:
+   - video: http://www.youtube.com/watch?v=wXwn0_mb62I
+ urls:
+ - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/
+Re-edit or quit? [E/t/d/q/?] q
+The file you are abandoning:
+
+start: 2013-05-30 19:00:00
+name: Brněnské PyVo + BRUG
+topic: GUI
+venue:
+  city: Brno
+  name: U Dřeváka
+  address: Dřevařská 22, 602 00
+  location:
+    latitude: '49.209095'
+    longitude: '16.6008957'
+talks:
+- title: Python a GTK, Getting Things GNOME!
+  speakers:
+  - Izidor Matušov
+  urls:
+  - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdm/
+  coverage:
+  - video: http://www.youtube.com/watch?v=HDmCGUKfe7Y
+- title: PySide & Qt
+  speakers:
+  - Petr Viktorin
+  urls:
+  - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdy/
+  coverage:
+  - video: http://www.youtube.com/watch?v=wXwn0_mb62I
+urls:
+- http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/
+

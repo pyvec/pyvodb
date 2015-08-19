@@ -1,11 +1,17 @@
 import os
 import pytest
 import textwrap
+import sys
+import io
+import builtins
 
 from click.testing import CliRunner
 import yaml
 
 from pyvodb.cli import cli
+from pyvodb.load import get_db
+from pyvodb import tables
+from pyvodb import cli as pyvodb_cli_module
 
 @pytest.fixture
 def runner():
@@ -14,14 +20,22 @@ def runner():
 
 @pytest.fixture
 def run(runner, data_directory, monkeypatch):
-    def _run(*args, now='2014-08-07 12:00:00'):
-        result = runner.invoke(cli, ('--data', data_directory) + args,
-                               env={'PYVO_TEST_NOW': now},
-                               obj={})
-        if result.exc_info and not isinstance(result.exc_info[1], SystemExit):
-            raise result.exc_info[1]
-        print(result.output)
-        return result
+    def _run(*args, now='2014-08-07 12:00:00', datadir=data_directory,
+             stdin_text=None, db=None):
+        prev_stdin = sys.stdin
+        try:
+            obj = {}
+            if db:
+                obj['db'] = db
+            result = runner.invoke(cli, ('--data', datadir) + args,
+                                   env={'PYVO_TEST_NOW': now},
+                                   obj=obj, input=stdin_text)
+            if result.exc_info and not isinstance(result.exc_info[1], SystemExit):
+                raise result.exc_info[1]
+            print(result.output)
+            return result
+        finally:
+            sys.stdin = prev_stdin
 
     return _run
 
@@ -245,3 +259,80 @@ def test_calendar_yaml(run):
     assert result.exit_code == 0
     output = yaml.safe_load(result.output)
     assert output[0]
+
+
+def test_edit_noninteractive(run, data_directory, tmpdir):
+    p = tmpdir.mkdir("brno").join("_f.yaml")
+    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
+        p.write(f.read())
+    db = get_db(str(tmpdir))
+    with open(os.path.join(data_directory, 'praha', '2011-01-17.yaml')) as f:
+        data = f.read()
+    result = run('edit', 'brno', '2013-05-30',
+                 datadir=str(tmpdir), stdin_text=data, db=db)
+    assert result.exit_code == 0
+    assert result.output == ''
+
+    assert tmpdir.join('praha/2011-01-17.yaml').check()
+    assert not tmpdir.join('brno/2013-05-30-gui.yaml').check()
+    assert tmpdir.join('praha/2011-01-17.yaml').read() == data
+
+    event = db.query(tables.Event).one()
+    assert str(event.date) == '2011-01-17'
+    assert event.city.name == 'Praha'
+
+
+def make_fake_input(inputs):
+    def fake_input(prompt):
+        current_input = inputs.pop(0)
+        print(prompt + current_input)
+        return current_input
+    return fake_input
+
+
+def test_edit_interactive(run, data_directory, tmpdir, monkeypatch):
+    monkeypatch.setattr(builtins, 'input', make_fake_input(['y']))
+    p = tmpdir.mkdir("brno").join("_f.yaml")
+    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
+        p.write(f.read())
+    db = get_db(str(tmpdir))
+    result = run('--editor', 'sed -i 1s/.$//',
+                 'edit', 'brno', '2013-05-30', '--interactive',
+                 datadir=str(tmpdir), db=db)
+
+    assert result.exit_code == 0
+
+    event = db.query(tables.Event).one()
+    assert event.city.name == 'Brn'
+
+
+@pytest.mark.parametrize(['editor', 'inputs', 'result_cityname', 'expected'], [
+    # editor removes last char in first line; Edit, show Diff, Yes (save)
+    ('sed -i 1s/.$//', ('e', 'd', 'y'), 'Br', 'edit1.session'),
+    # editor removes first line; Traceback, show Diff, Quit
+    ('sed -i 1s/.*//', ('t', 'd', 'q'), 'Brno', 'edit2.session'),
+])
+def test_edit_interactive_dialog(run, data_directory, tmpdir, monkeypatch,
+                                 editor, inputs, result_cityname, expected):
+    """Test interactive commands for editor"""
+    monkeypatch.setattr(builtins, 'input', make_fake_input(list(inputs)))
+    p = tmpdir.mkdir("brno").join("_f.yaml")
+    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
+        p.write(f.read())
+    db = get_db(str(tmpdir))
+    result = run('--editor', editor,
+                 'edit', 'brno', '2013-05-30', '--interactive',
+                 datadir=str(tmpdir), db=db)
+
+    assert result.exit_code == 0
+
+    event = db.query(tables.Event).one()
+    assert event.city.name == result_cityname
+
+    expected_filename = os.path.join(os.path.dirname(__file__),
+                                     'expected', expected)
+    with open(expected_filename) as f:
+        expected = f.read()
+        expected = expected.replace('$f', str(tmpdir))
+        expected = expected.replace('$c', pyvodb_cli_module.__file__)
+        assert result.output == expected
