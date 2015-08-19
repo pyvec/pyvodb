@@ -15,11 +15,13 @@ talks:
 - title: <remove this>
   urls:
   - http://lanyrd.com/2015/praha-pyvo-april/sdmffk/
+  coverage: []
 - title: 'RAML and Flask for API: the Story'
   speakers:
   - Jan Killian
   urls:
   - http://lanyrd.com/2015/praha-pyvo-april/sdmfqy/
+  coverage: []
   description: 'Modelling API in Rest API Markup Language.
 
     Using RAML model for automatic parameter conversion/validation, and mock-up server
@@ -36,6 +38,7 @@ talks:
   - Jirka Vejrazka
   urls:
   - http://lanyrd.com/2015/praha-pyvo-april/sdmffp/
+  coverage: []
 - title: PATCH
   speakers:
   - Honza Javorek

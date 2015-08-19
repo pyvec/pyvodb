@@ -129,12 +129,8 @@ class Event(TableBase):
             if talk.is_lightning:
                 talk_info['lightning'] = True
             talk_info['speakers'] = [s.name for s in talk.speakers]
-            urls = [l.url for l in talk.links if l.kind == 'talk']
-            if urls:
-                talk_info['urls'] = urls
-            coverage = [{l.kind: l.url} for l in talk.links if l.kind != 'talk']
-            if coverage:
-                talk_info['coverage'] = coverage
+            talk_info['urls'] = [l.url for l in talk.links if l.kind == 'talk']
+            talk_info['coverage'] = [{l.kind: l.url} for l in talk.links if l.kind != 'talk']
             if talk.description:
                 talk_info['description'] = talk.description
 
@@ -149,10 +145,8 @@ class Event(TableBase):
         if self.description is not None:
             result['description'] = self.description
         result['venue'] = venue_info
-        if talks:
-            result['talks'] = talks
-        if self.links:
-            result['urls'] = [l.url for l in self.links]
+        result['talks'] = talks
+        result['urls'] = [l.url for l in self.links]
         return result
 
 

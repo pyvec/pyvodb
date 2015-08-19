@@ -24,5 +24,6 @@ venue:
   location:
     latitude: '49.103519'
     longitude: '16.939251'
+talks: []
 urls:
 - http://lanyrd.com/2014/brnenske-pyvo-brug-bitva-tri-cisaru/

@@ -25,5 +25,6 @@ venue:
   location:
     latitude: '49.1908217'
     longitude: '16.6117627'
+talks: []
 urls:
 - http://lanyrd.com/2014/brno-pyvo-unorove/
