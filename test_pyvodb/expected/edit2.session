@@ -2,9 +2,9 @@ Error doing sanity check
 KeyError: 'city'
 Re-edit or quit? [E/t/d/q/?] t
 Traceback (most recent call last):
-  File "$c", line 594, in edit
+  File ..., in edit
     yaml_data = next(load_process)
-  File "$c", line 491, in load_new_entry
+  File ..., in load_new_entry
     city = info['city']
 KeyError: 'city'
 Re-edit or quit? [E/t/d/q/?] d

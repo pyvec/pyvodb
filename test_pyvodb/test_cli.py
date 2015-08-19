@@ -4,6 +4,7 @@ import textwrap
 import sys
 import io
 import builtins
+import re
 
 from click.testing import CliRunner
 import yaml
@@ -333,5 +334,11 @@ def test_edit_interactive_dialog(run, data_directory, tmpdir, monkeypatch,
                                      'expected', expected)
     with open(expected_filename) as f:
         expected = f.read()
-        expected = expected.replace('$c', pyvodb_cli_module.__file__)
-        assert result.output == expected
+
+    f = pyvodb_cli_module.__file__
+    output = result.output
+    output = re.sub(r'File "{}", line \d+,'.format(re.escape(f)),
+                        'File ...,',
+                        output)
+
+    assert output == expected
