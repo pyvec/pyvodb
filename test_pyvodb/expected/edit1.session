@@ -1,4 +1,4 @@
---- $f/brno/_f.yaml
+--- brno/_f.yaml
 +++ brn/2013-05-30-gui.yaml
 @@ -1,28 +1,28 @@
 -city: Brno
@@ -31,7 +31,7 @@
  urls:
  - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/
 Save this change? [Y/e/d/q/?] e
---- $f/brno/_f.yaml
+--- brno/_f.yaml
 +++ br/2013-05-30-gui.yaml
 @@ -1,28 +1,28 @@
 -city: Brno
@@ -64,7 +64,7 @@ Save this change? [Y/e/d/q/?] e
  urls:
  - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/
 Save this change? [Y/e/d/q/?] d
---- $f/brno/_f.yaml
+--- brno/_f.yaml
 +++ br/2013-05-30-gui.yaml
 @@ -1,28 +1,28 @@
 -city: Brno

@@ -487,14 +487,11 @@ def load_new_entry(db, term, datadir, previous_entry, info):
     """
     previous_source = previous_entry._source
     try:
-        phase = 'sanity check'
+        phase = 'doing sanity check'
         city = info['city']
 
         phase = 'rolling back transaction'
         db.rollback()
-
-        phase = 'loading YAML'
-        yaml_data = yaml_dump(info)
 
         phase = 'deleting previous entry'
         db.delete(previous_entry)
@@ -503,7 +500,7 @@ def load_new_entry(db, term, datadir, previous_entry, info):
         phase = 'adding new entry'
         info['_source'] = os.path.join(
             datadir, event_filename(info))
-        load_from_infos(db, [info], commit=False)
+        [event_id] = load_from_infos(db, [info], commit=False)
         del info['_source']
 
     except Exception:
@@ -511,7 +508,9 @@ def load_new_entry(db, term, datadir, previous_entry, info):
             print(term.red('Error {}'.format(phase)))
         raise
 
-    yield
+    new_entry = db.query(tables.Event).get(event_id)
+    yaml_data = yaml_dump(new_entry.as_dict())
+    yield yaml_data
 
     db.commit()
     prev_src_path = pathlib.Path(previous_source)
@@ -525,15 +524,14 @@ def load_new_entry(db, term, datadir, previous_entry, info):
     with open(new_path, 'w') as f:
         f.write(yaml_data)
 
-    yield  # just so the second next() doesn't raise an exception
-
 
 @cli.command()
 @click.argument('city')
 @click.argument('date', required=False)
 @click.option('-i/-I', '--interactive/--no-interactive', default=None,
               help='Ask for opions interactively, and edit in editor '
-                   '(default if stdin is a TTY).')
+                   '(default if stdin is a TTY).\n'
+                   'For non-interactive use, new entry is expected on stdin')
 @click.pass_context
 def edit(ctx, city, date, interactive):
     """Edit a particular meetup.
@@ -560,15 +558,18 @@ def edit(ctx, city, date, interactive):
         load_process = load_new_entry(db, term, datadir, previous_event, info)
         next(load_process)
         # No confirmation step in non-interactive mode
-        next(load_process)
+        next(load_process, None)
         return
 
-    previous_dict = previous_event.as_dict()
+    previous_dict = info = previous_event.as_dict()
     previous_data = yaml_dump(previous_dict)
 
     def show_current_diff():
+        if previous_source:
+            psrc = os.path.join(datadir, previous_source)
+            psrc = os.path.relpath(psrc, datadir)
         show_diff(term, previous_data, yaml_data,
-                  previous_source or event_filename(previous_dict),
+                  psrc or event_filename(previous_dict),
                   event_filename(info))
 
     fd, temp_filename = tempfile.mkstemp(suffix='.yaml')
@@ -588,11 +589,11 @@ def edit(ctx, city, date, interactive):
             try:
                 info = yaml_ordered_load(yaml_data)
 
-                show_current_diff()
-
                 load_process = load_new_entry(db, term, datadir,
                                               previous_event, info)
-                next(load_process)
+                yaml_data = next(load_process)
+
+                show_current_diff()
             except Exception as e:
                 print('{}: {}'.format(type(e).__name__, e))
                 prompt = 'Re-edit or quit?'
@@ -601,13 +602,9 @@ def edit(ctx, city, date, interactive):
                 saved_error = e
                 default = 'e'
             else:
-                if yaml_data == previous_data:
-                    prompt = 'Re-edit or quit?'
-                    default = 'e'
-                else:
-                    prompt = 'Save this change?'
-                    options['y'] = 'save entry'
-                    default = 'y'
+                prompt = 'Save this change?'
+                options['y'] = 'save entry'
+                default = 'y'
 
             options['e'] = 're-edit'
             # XXX: a debug option to enable this?
@@ -626,7 +623,7 @@ def edit(ctx, city, date, interactive):
                     subprocess.check_call(editor + [temp_filename])
                     break
                 elif answer == 'y':
-                    next(load_process)
+                    next(load_process, None)
                     return
                 elif answer == 'q':
                     print(term.yellow('The file you are abandoning:'))

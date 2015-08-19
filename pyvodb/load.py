@@ -126,7 +126,7 @@ def load_from_infos(db, infos, commit=True):
                 'index': si,
             }
             for e in infos
-            for ti, t in enumerate(e['talks'])
+            for ti, t in enumerate(e.get('talks', ()))
             for si, s in enumerate(t.get('speakers', ()))
         ]
         if talk_speaker_values:
@@ -140,7 +140,7 @@ def load_from_infos(db, infos, commit=True):
                 'url': one(l.values()),
             }
             for e in infos
-            for ti, t in enumerate(e['talks'])
+            for ti, t in enumerate(e.get('talks', ()))
             for li, l in enumerate([{'talk': u} for u in t.get('urls', ())] +
                                    t.get('coverage', []))
         ]
@@ -243,7 +243,7 @@ def load_speakers(db, infos):
         db=db,
         sources=[{'name': s}
                  for i in infos
-                 for t in i['talks']
+                 for t in i.get('talks', ())
                  for s in t.get('speakers', ())],
         table=tables.Speaker.__table__,
         key_columns=('name', ),
@@ -267,7 +267,7 @@ def load_talks(db, infos, event_ids, city_ids):
         db=db,
         sources=[make_values(i, e, t)
                  for e in infos
-                 for i, t in enumerate(e['talks'])],
+                 for i, t in enumerate(e.get('talks', ()))],
         table=tables.Talk.__table__,
         key_columns=('event_id', 'index'),
     )

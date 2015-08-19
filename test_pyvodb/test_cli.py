@@ -333,6 +333,5 @@ def test_edit_interactive_dialog(run, data_directory, tmpdir, monkeypatch,
                                      'expected', expected)
     with open(expected_filename) as f:
         expected = f.read()
-        expected = expected.replace('$f', str(tmpdir))
         expected = expected.replace('$c', pyvodb_cli_module.__file__)
         assert result.output == expected
