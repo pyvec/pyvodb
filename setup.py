@@ -19,7 +19,7 @@ class PyTest(TestCommand):
 
 setup_args = dict(
     name='pyvodb',
-    version='0.0.3',
+    version='0.1',
     packages=['pyvodb'],
     url='https://github.com/pyvec/pyvodb',
 
