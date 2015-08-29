@@ -2,7 +2,6 @@ import os
 import pytest
 import textwrap
 import sys
-import io
 import builtins
 import re
 
@@ -336,7 +335,7 @@ def test_edit_interactive_dialog(run, data_directory, tmpdir, monkeypatch,
     with open(expected_filename) as f:
         expected = f.read()
 
-    f = pyvodb_cli_module.__file__
+    f = pyvodb_cli_module.edit.__file__
     output = result.output
     output = re.sub(r'File "{}", line \d+,'.format(re.escape(f)),
                         'File ...,',

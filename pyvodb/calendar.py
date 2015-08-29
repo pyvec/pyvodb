@@ -1,6 +1,5 @@
 import datetime
 import collections
-import functools
 
 from czech_holidays import Holidays
 from dateutil.relativedelta import relativedelta

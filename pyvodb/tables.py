@@ -10,7 +10,6 @@ from sqlalchemy.types import Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
 from dateutil import tz

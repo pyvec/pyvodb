@@ -1,4 +1,3 @@
-import os
 import pytest
 
 from pyvodb.load import get_db, load_from_directory, yield_filenames

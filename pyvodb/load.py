@@ -5,8 +5,7 @@ import re
 import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.sql.expression import select, and_, or_
+from sqlalchemy.sql.expression import select, and_
 import unidecode
 
 from . import tables
@@ -45,7 +44,6 @@ def get_db(directory, engine=None):
 def yield_filenames(directory):
     """Yield YAML data filenames from a root directory
     """
-    directories = []
     for dirpath, dirnames, filenames in os.walk(directory):
         dirnames[:] = [d for d in dirnames if (d in ('.', '..') or
                                                not d.startswith('.'))]
@@ -253,8 +251,6 @@ def load_speakers(db, infos):
 def load_talks(db, infos, event_ids, city_ids):
 
     def make_values(index, event_info, talk_info):
-        city_id = city_ids[(event_info['city'], )]
-        event_key = city_id, event_info['start'].date(), event_info['start'].time()
         return {
             'title': talk_info['title'],
             'index': index,
