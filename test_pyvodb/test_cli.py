@@ -23,6 +23,8 @@ def runner():
 def run(runner, data_directory, monkeypatch):
     def _run(*args, now='2014-08-07 12:00:00', datadir=data_directory,
              stdin_text=None, db=None):
+        if stdin_text and os.environ.get('TRAVIS') == 'true':
+            raise pytest.skip("stdin redirection doesn't work on Travis")
         prev_stdin = sys.stdin
         try:
             obj = {}

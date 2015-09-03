@@ -1,0 +1,15 @@
+language: python
+
+python:
+  - "3.3"
+  - "3.4"
+  #- "3.5-dev"
+  #- "nightly"
+
+install:
+  - pip install -e.
+  - pip install pytest
+
+script: py.test
+
+sudo: false
