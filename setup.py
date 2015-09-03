@@ -17,6 +17,23 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
+requires = [
+    'blessings >= 1.6, < 2.0',
+    'sqlalchemy >= 1.0, < 2.0',
+    'PyYAML >= 3.11, < 4.0',
+    'unidecode >= 0.04, < 1.0',
+    'python-dateutil >= 2.4.2, <3.0',
+    'click >= 4.1, <5.0',
+    'czech-holidays',
+    'blessings >= 1.6, < 2.0',
+]
+
+tests_require = ['pytest']
+
+if sys.version_info < (3, 4):
+    # pathlib is in the stdlib since Python 3.4
+    requires.append('pathlib >= 1.0.1, < 2.0')
+
 setup_args = dict(
     name='pyvodb',
     version='0.1',
@@ -35,18 +52,9 @@ setup_args = dict(
         'Programming Language :: Python :: 3.4',
     ],
 
-    install_requires=[
-        'blessings >= 1.6, < 2.0',
-        'sqlalchemy >= 1.0, < 2.0',
-        'PyYAML >= 3.11, < 4.0',
-        'unidecode >= 0.04, < 1.0',
-        'python-dateutil >= 2.4.2, <3.0',
-        'click >= 4.1, <5.0',
-        'czech-holidays',
-        'blessings >= 1.6, < 2.0',
-    ],
+    install_requires=requires,
 
-    tests_require=['pytest'],
+    tests_require=tests_require,
     cmdclass={'test': PyTest},
 
     entry_points={
