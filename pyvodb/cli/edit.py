@@ -86,7 +86,7 @@ def remove_source_file(filename, datadir):
         path.unlink()
 
 
-def load_new_entry(db, term, datadir, previous_entry, info):
+def load_new_entry(db, datadir, info, previous_entry=None, term=None):
     """Load a new entry from `info`, pausing for confirmation
 
     Returns an iterator for a two-part loading process:
@@ -101,7 +101,10 @@ def load_new_entry(db, term, datadir, previous_entry, info):
     :param previous_entry: The previous Event, which will be deleted
     :param info: Dict with new event info
     """
-    previous_source = previous_entry._source
+    if previous_entry is None:
+        previous_entry = None
+    else:
+        previous_source = previous_entry._source
     try:
         phase = 'doing sanity check'
         city = info['city']
@@ -109,9 +112,10 @@ def load_new_entry(db, term, datadir, previous_entry, info):
         phase = 'rolling back transaction'
         db.rollback()
 
-        phase = 'deleting previous entry'
-        db.delete(previous_entry)
-        db.flush()
+        if previous_entry:
+            phase = 'deleting previous entry'
+            db.delete(previous_entry)
+            db.flush()
 
         phase = 'adding new entry'
         info['_source'] = os.path.join(
@@ -129,7 +133,8 @@ def load_new_entry(db, term, datadir, previous_entry, info):
     yield yaml_data
 
     db.commit()
-    remove_source_file(previous_source, datadir)
+    if previous_source:
+        remove_source_file(previous_source, datadir)
     new_path = os.path.join(datadir, event_filename(info))
     try:
         os.makedirs(os.path.dirname(new_path))
@@ -169,7 +174,8 @@ def edit(ctx, city, date, interactive):
         yaml_data = sys.stdin.read()
         assert yaml_data
         info = yaml_ordered_load(yaml_data)
-        load_process = load_new_entry(db, term, datadir, previous_event, info)
+        load_process = load_new_entry(db, datadir, info,
+                                      previous_entry=previous_event, term=term)
         next(load_process)
         # No confirmation step in non-interactive mode
         next(load_process, None)
@@ -203,8 +209,9 @@ def edit(ctx, city, date, interactive):
             try:
                 info = yaml_ordered_load(yaml_data)
 
-                load_process = load_new_entry(db, term, datadir,
-                                              previous_event, info)
+                load_process = load_new_entry(db, datadir, info,
+                                              previous_entry=previous_event,
+                                              term=term)
                 yaml_data = next(load_process)
 
                 show_current_diff()
