@@ -19,8 +19,7 @@ TableBase = declarative_base(metadata=metadata)
 
 CET = tz.gettz('Europe/Prague')
 
-YOUTUBE_PREFIX = 'http://www.youtube.com/watch?v='
-YOUTUBE_RE = re.compile(re.escape(YOUTUBE_PREFIX) + '([-0-9a-zA-Z_]+)')
+YOUTUBE_RE = re.compile('https?://www.youtube.com/watch\?v=([-0-9a-zA-Z_]+)')
 
 
 def use_memo(name, fields):
