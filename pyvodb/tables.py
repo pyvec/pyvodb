@@ -22,22 +22,6 @@ CET = tz.gettz('Europe/Prague')
 YOUTUBE_RE = re.compile('https?://www.youtube.com/watch\?v=([-0-9a-zA-Z_]+)')
 
 
-def use_memo(name, fields):
-    def decorator(func):
-        def inner(*args, memo=None, **kwargs):
-            if memo is None:
-                memo = {}
-            values = tuple(kwargs[f] for f in fields)
-            d = memo.setdefault(name, {})
-            try:
-                result = d[values]
-            except:
-                result = d[values] = func(*args, memo=memo, **kwargs)
-            return result
-        return inner
-    return decorator
-
-
 def date_property(name):
     @hybrid_property
     def _func(self):
@@ -51,7 +35,7 @@ def date_property(name):
 class Event(TableBase):
     u"""An event."""
     __tablename__ = 'events'
-    __table_args__ = (UniqueConstraint('city_id', 'date', 'start_time'),)
+    __table_args__ = (UniqueConstraint('city_slug', 'date', 'start_time'),)
     id = Column(
         Integer, primary_key=True, nullable=False,
         doc=u"An internal numeric ID")
@@ -76,10 +60,10 @@ class Event(TableBase):
     _source = Column(
         Unicode(), nullable=True,
         doc=u"File from which the entry was loaded")
-    city_id = Column(ForeignKey('cities.id'), nullable=False)
+    city_slug = Column(ForeignKey('cities.slug'), nullable=False)
     city = relationship('City', backref=backref('events',
                                                 order_by=desc('date')))
-    venue_id = Column(ForeignKey('venues.id'), nullable=False)
+    venue_id = Column(ForeignKey('venues.id'), nullable=True)
     venue = relationship('Venue', backref=backref('events'))
     talks = relationship('Talk', collection_class=ordering_list('index'),
                          order_by='Talk.index',
@@ -151,28 +135,35 @@ class Event(TableBase):
 class City(TableBase):
     u"""A city that holds events"""
     __tablename__ = 'cities'
-    id = Column(
-        Integer, primary_key=True, nullable=False,
-        doc=u"An internal numeric ID")
+    slug = Column(
+        Unicode(), primary_key=True,
+        doc=u"Unique identifier for use in URLs")
     name = Column(
         Unicode(), nullable=False,
         doc=u"Name of the city")
-    slug = Column(
-        Unicode(), nullable=False, unique=True,
-        doc=u"Unique identifier for use in URLs")
+    longitude = Column(
+        Unicode(), nullable=False,
+        doc=u"Longitude of the location")
+    latitude = Column(
+        Unicode(), nullable=False,
+        doc=u"Latitude of the location")
+    _source = Column(
+        Unicode(), nullable=True,
+        doc=u"File from which the entry was loaded")
 
 
 class Venue(TableBase):
     u"""A venue to old events in"""
     __tablename__ = 'venues'
+    __table_args__ = (UniqueConstraint('city_slug', 'slug'),)
     id = Column(
         Integer, primary_key=True, nullable=False,
         doc=u"An internal numeric ID")
     name = Column(
         Unicode(), nullable=False,
         doc=u"Name of the venue")
-    city = Column(
-        Unicode(), nullable=False,
+    city_slug = Column(
+        ForeignKey('cities.slug'), nullable=False,
         doc=u"City of the venue")
     address = Column(
         Unicode(), nullable=True,
@@ -184,8 +175,10 @@ class Venue(TableBase):
         Unicode(), nullable=False,
         doc=u"Latitude of the location")
     slug = Column(
-        Unicode(), nullable=False, unique=True,
-        doc=u"Unique identifier for use in URLs")
+        Unicode(), nullable=False,
+        doc=u"Identifier for use in URLs")
+
+    city = relationship('City', backref=backref('venues'))
 
     @property
     def short_address(self):
@@ -243,12 +236,12 @@ class Talk(TableBase):
 
 class Speaker(TableBase):
     __tablename__ = 'speakers'
-    id = Column(
-        Integer, primary_key=True, nullable=False,
-        doc=u"An internal numeric ID")
+    slug = Column(
+        Unicode(), primary_key=True,
+        doc=u"Slug to be used in URLs")
     name = Column(
         Unicode(), nullable=False,
-        doc=u"Name of the venue")
+        doc=u"Name of the speaker")
     talk_speakers = relationship('TalkSpeaker', backref=backref('speaker'))
     talks = association_proxy('talk_speakers', 'talk',
                               creator=lambda t: TalkSpeaker(talk=t))
@@ -256,8 +249,12 @@ class Speaker(TableBase):
 
 class TalkSpeaker(TableBase):
     __tablename__ = 'talk_speakers'
-    talk_id = Column(ForeignKey('talks.id'), primary_key=True, nullable=False)
-    speaker_id = Column(ForeignKey('speakers.id'), primary_key=True, nullable=False)
+    talk_id = Column(
+        ForeignKey('talks.id'),
+        primary_key=True, nullable=False)
+    speaker_slug = Column(
+        ForeignKey('speakers.slug'),
+        primary_key=True, nullable=False)
     index = Column(
         Integer(), nullable=True,
         doc=u"Index in order of a talk's speakers")
@@ -265,7 +262,8 @@ class TalkSpeaker(TableBase):
 
 class TalkLink(TableBase):
     __tablename__ = 'talk_links'
-    talk_id = Column(ForeignKey('talks.id'), primary_key=True, nullable=False)
+    talk_id = Column(
+        ForeignKey('talks.id'), primary_key=True, nullable=False)
     url = Column(Unicode(), primary_key=True, nullable=False)
     index = Column(
         Integer(),

@@ -1,12 +1,12 @@
 import os
 import datetime
-import re
+import contextlib
+import sys
 
 import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql.expression import select, and_
-import unidecode
+from sqlalchemy.sql.expression import select
 
 from . import tables
 
@@ -14,15 +14,6 @@ try:
     YAML_SAFE_LOADER = yaml.CSafeLoader
 except AttributeError:
     YAML_SAFE_LOADER = yaml.SafeLoader
-
-
-def slugify(name):
-    """Make a filename-friendly approximation of a string
-
-    The result only uses the characters a-z, 0-9, _, -
-    """
-    decoded = unidecode.unidecode(name).lower()
-    return re.sub('[^a-z0-9_]+', '-', decoded).strip('-')
 
 
 def get_db(directory, engine=None):
@@ -41,325 +32,234 @@ def get_db(directory, engine=None):
     return db
 
 
-def yield_filenames(directory):
-    """Yield YAML data filenames from a root directory
-    """
-    for dirpath, dirnames, filenames in os.walk(directory):
-        dirnames[:] = [d for d in dirnames if (d in ('.', '..') or
-                                               not d.startswith('.'))]
-        for filename in filenames:
-            if filename.endswith('.yaml'):
-                yield os.path.join(dirpath, filename)
+def dict_from_directory(directory, root):
+    data = {}
+    for filename in os.listdir(os.path.join(root, directory)):
+        fullname = os.path.join(directory, filename)
+        absname = os.path.join(root, fullname)
+        if filename in ('.git', 'README') or filename.startswith('.'):
+            pass
+        elif filename.endswith('.yaml'):
+            with open(absname) as f:
+                info = yaml.load(f, Loader=YAML_SAFE_LOADER)
+            info['_source'] = fullname
+            data[filename[:-5]] = info
+        elif os.path.isdir(absname):
+            data[filename] = dict_from_directory(fullname, root)
+        else:
+            raise ValueError('Unexpected file: ' + fullname)
+    return data
 
 
 def load_from_directory(db, directory):
-    """Add data from a directory to a database
-    """
-    infos = (get_info(f) for f in yield_filenames(directory))
-    load_from_infos(db, infos)
+    print('Reading YAML', file=sys.stderr)
+    data = dict_from_directory('.', directory)
+    print('Loading DB', file=sys.stderr)
+    load_from_dict(db, data)
 
 
-def load_from_file(db, filename):
-    """Add data from a single file to a database
-    """
-    info = get_info(filename)
-    load_from_infos(db, [info])
-
-
-def get_info(filename):
-    with open(filename) as f:
-        info = yaml.load(f, Loader=YAML_SAFE_LOADER)
-    info['_source'] = os.path.abspath(filename)
-    return info
-
-
-def one(container):
-    [obj] = container
-    return obj
-
-
-def _fixup(infos):
-    for info in infos:
-        info = dict(info)
-        start = info['start']
-        if hasattr(start, 'time'):
-            date = start.date()
-            time = start.time()
-        else:
-            date = start
-            time = datetime.time(hour=19)
-        info['start'] = datetime.datetime.combine(date, time)
-        yield info
-
-
-def load_from_infos(db, infos, commit=True):
-    """Load data from a list of info dicts (as loaded from YAML) into database
+def load_from_dict(db, data):
+    """Load data from a dict (as loaded from directory of YAMLs) into database
     """
     # The ORM overhead is too high for this kind of bulk load,
     # so drop down to SQLAlchemy Core.
     # This tries to do minimize the number of SQL commands by loading entire
     # tables at once
-    infos = tuple(_fixup(infos))
-    try:
-        # First, entries that might already exist.
-        # If they do, don't create duplicates, but check that they new
-        # and existing entries are the same.
-        # In other words, we don't do updates here.
-        city_ids = load_cities(db, infos)
-        venue_ids = load_venues(db, infos)
-        speaker_ids = load_speakers(db, infos)
 
-        # For events, we don't allow re-adding an existing entry
-        event_ids = load_events(db, infos, city_ids, venue_ids)
+    if data['meta']['version'] != 2:
+        raise ValueError('Can only load version 2')
 
-        # All talks must be tied to a newly added event
-        talk_ids = load_talks(db, infos, event_ids, city_ids)
+    # Load cities, and their venues
 
-        # Last but not least come the ID-less tables, all of which are also
-        # tied to a newly added event.
-        talk_speaker_values = [
-            {
-                'speaker_id': speaker_ids[s, ],
-                'talk_id': talk_ids[e['_id'], ti],
-                'index': si,
-            }
-            for e in infos
-            for ti, t in enumerate(e.get('talks', ()))
-            for si, s in enumerate(t.get('speakers', ()))
-        ]
-        if talk_speaker_values:
-            db.execute(tables.TalkSpeaker.__table__.insert(), talk_speaker_values)
+    with contextlib.ExitStack() as stack:
+        insert_city, city_slugs = stack.enter_context(bulk_loader(
+            db, tables.City, id_column='slug'))
 
-        talk_link_values = [
-            {
-                'talk_id': talk_ids[e['_id'], ti],
-                'index': li,
-                'kind': one(l.keys()),
-                'url': one(l.values()),
-            }
-            for e in infos
-            for ti, t in enumerate(e.get('talks', ()))
-            for li, l in enumerate([{'talk': u} for u in t.get('urls', ())] +
-                                   t.get('coverage', []))
-        ]
-        if talk_link_values:
-            db.execute(tables.TalkLink.__table__.insert(), talk_link_values)
+        insert_venue, venue_ids = stack.enter_context(bulk_loader(
+            db, tables.Venue, key_columns=['city_slug', 'slug']))
 
-        event_link_values = [
-            {
-                'event_id': e['_id'],
-                'index': li,
-                'url': l,
-            }
-            for e in infos
-            for li, l in enumerate(e.get('urls', ()))
-        ]
-        if event_link_values:
-            db.execute(tables.EventLink.__table__.insert(), event_link_values)
+        for city_slug, city in data['cities'].items():
+            city_data = city['city']
+            insert_city({
+                'slug': city_slug,
+                'name': city_data['name'],
+                'latitude': city_data['location']['latitude'],
+                'longitude': city_data['location']['longitude'],
+                '_source': city_data['_source'],
+            })
 
-    except:
-        db.rollback()
-        raise
+            for venue_slug, venue in city.get('venues', {}).items():
+                insert_venue({
+                    'city_slug': city_slug,
+                    'slug': venue_slug,
+                    'name': venue['name'],
+                    'address': venue['address'],
+                    'latitude': venue['location']['latitude'],
+                    'longitude': venue['location']['longitude'],
+                })
+
+    # Load speakers
+
+    speaker_slugs = set()
+    with contextlib.ExitStack() as stack:
+        insert, speaker_ids = stack.enter_context(bulk_loader(
+            db, tables.Speaker, id_column='slug'))
+
+        for series_slug, series in data['series'].items():
+            for event_slug, event in series['events'].items():
+                for talk in event.get('talks'):
+                    for speaker in talk.get('speakers', ()):
+                        if speaker not in speaker_slugs:
+                            speaker_slugs.add(speaker)
+                            insert({
+                                'slug': speaker,
+                                'name': speaker,
+                            })
+
+    # Load events
+
+    with contextlib.ExitStack() as stack:
+        insert, event_ids = stack.enter_context(bulk_loader(
+            db, tables.Event,
+            key_columns=['city_slug', 'date', 'start_time']))
+
+        for series_slug, series in data['series'].items():
+            for event_slug, event in series['events'].items():
+                venue_slug = event.get('venue')
+                city_slug = event['city']
+                if venue_slug:
+                    venue_id = venue_ids[city_slug, venue_slug]
+                else:
+                    venue_id = None
+
+                start = make_full_datetime(event['start'])
+                insert({
+                    'name': event['name'],
+                    'number': event.get('number'),
+                    'topic': event.get('topic'),
+                    'description': event.get('description'),
+                    'date': start.date(),
+                    'start_time': start.time(),
+                    'city_slug': city_slug,
+                    'venue_id': venue_id,
+                    '_source': event['_source']
+                })
+
+    # Load event talks and links
+
+    with contextlib.ExitStack() as stack:
+        insert_talk, talk_ids = stack.enter_context(bulk_loader(
+            db, tables.Talk,
+            key_columns=['event_id', 'index']))
+
+        insert_event_link, _ids = stack.enter_context(bulk_loader(
+            db, tables.EventLink,
+            key_columns=['event_id', 'index'], id_column=None))
+
+        for series_slug, series in data['series'].items():
+            for event_slug, event in series['events'].items():
+                full_start = make_full_datetime(event['start'])
+                event_key = (event['city'],
+                             full_start.date(), full_start.time())
+                event_id = event_ids[event_key]
+                for i, talk in enumerate(event.get('talks', ())):
+                    insert_talk({
+                        'event_id': event_id,
+                        'index': i,
+                        'title': talk['title'],
+                        'description': talk.get('description'),
+                        'is_lightning': talk.get('is_lightning', False),
+                    })
+
+                for i, url in enumerate(event.get('urls', ())):
+                    insert_event_link({
+                        'event_id': event_id,
+                        'index': i,
+                        'url': url,
+                    })
+
+    # Load talk speakers and links
+
+    with contextlib.ExitStack() as stack:
+        insert_talk_speaker, _ids = stack.enter_context(bulk_loader(
+            db, tables.TalkSpeaker,
+            key_columns=['talk_id', 'speaker_slug'], id_column=None))
+        insert_talk_link, _ids = stack.enter_context(bulk_loader(
+            db, tables.TalkLink,
+            key_columns=['talk_id', 'url'], id_column=None))
+
+        for series_slug, series in data['series'].items():
+            for event_slug, event in series['events'].items():
+                for i, talk in enumerate(event.get('talks', ())):
+                    full_start = make_full_datetime(event['start'])
+                    event_key = (event['city'],
+                                 full_start.date(), full_start.time())
+                    event_id = event_ids[event_key]
+                    talk_id = talk_ids[event_id, i]
+                    for i, speaker in enumerate(talk.get('speakers', ())):
+                        assert speaker in speaker_slugs
+                        insert_talk_speaker({
+                            'talk_id': talk_id,
+                            'index': i,
+                            'speaker_slug': speaker,
+                        })
+
+                    for i, link in enumerate([
+                            *({'talk': u} for u in talk.get('urls', ())),
+                            *talk.get('coverage', {})]):
+                        for kind, url in link.items():
+                            insert_talk_link({
+                                'talk_id': talk_id,
+                                'index': i,
+                                'url': url,
+                                'kind': kind,
+                            })
+
+
+def make_full_datetime(value):
+    if hasattr(value, 'time'):
+        date = value.date()
+        time = value.time()
     else:
-        if commit:
-            db.commit()
-        else:
-            db.expire_all()
-    return set(event_ids.values())
+        date = value
+        time = datetime.time(hour=19)
+    return datetime.datetime.combine(date, time)
 
 
-def load_cities(db, infos):
+@contextlib.contextmanager
+def bulk_loader(db, orm_class, key_columns=None, id_column='id'):
+    if key_columns is None:
+        if id_column is None:
+            raise ValueError('no key or id column')
+        key_columns = [id_column]
 
-    def make_values(info):
-        name = info['city']
-        return {
-            'name': name,
-            'slug': slugify(name),
-        }
+    rows = []
+    result_map = {}
+    table = orm_class.__table__
 
-    return bulk_load(
-        db=db,
-        sources=[make_values(i) for i in infos],
-        table=tables.City.__table__,
-        key_columns=('name', ),
-    )
+    yield rows.append, result_map
 
-
-def load_venues(db, infos):
-
-    def make_values(info):
-        return {
-            'name': info['name'],
-            'city': info['city'],
-            'address': info.get('address'),
-            'longitude': info['location']['longitude'],
-            'latitude': info['location']['latitude'],
-            'slug': slugify(info['name']),
-        }
-
-    return bulk_load(
-        db=db,
-        sources=[make_values(i['venue']) for i in infos],
-        table=tables.Venue.__table__,
-        key_columns=('name', ),
-        ignored_columns=('address', ),  # XXX: addresses from Lanyrd are unreliable
-    )
-
-
-def load_events(db, infos, city_ids, venue_ids):
-
-    def make_values(info):
-        result = {
-            'name': info['name'],
-            'number': info.get('number'),
-            'topic': info.get('topic'),
-            'description': info.get('description'),
-            'date': info['start'].date(),
-            'start_time': info['start'].time(),
-            'city_id': city_ids[(info['city'], )],
-            'venue_id': venue_ids[(info['venue']['name'], )],
-            '_source': info.get('_source'),
-        }
-        return result
-
-    sources = [make_values(i) for i in infos]
-    idmap = bulk_load(
-        db=db,
-        sources=sources,
-        table=tables.Event.__table__,
-        key_columns=('city_id', 'date', 'start_time'),
-        no_existing=True,
-    )
-    for source, info in zip(sources, infos):
-        info['_id'] = idmap[source['city_id'], source['date'], source['start_time']]
-    return idmap
-
-
-def load_speakers(db, infos):
-
-    return bulk_load(
-        db=db,
-        sources=[{'name': s}
-                 for i in infos
-                 for t in i.get('talks', ())
-                 for s in t.get('speakers', ())],
-        table=tables.Speaker.__table__,
-        key_columns=('name', ),
-    )
-
-
-def load_talks(db, infos, event_ids, city_ids):
-
-    def make_values(index, event_info, talk_info):
-        return {
-            'title': talk_info['title'],
-            'index': index,
-            'is_lightning': talk_info.get('lightning', False),
-            'event_id': event_info['_id'],
-            'description': talk_info.get('description'),
-        }
-
-    return bulk_load(
-        db=db,
-        sources=[make_values(i, e, t)
-                 for e in infos
-                 for i, t in enumerate(e.get('talks', ()))],
-        table=tables.Talk.__table__,
-        key_columns=('event_id', 'index'),
-    )
-
-
-def _get_idmap(rows, key_col_count, keys):
-    kv = ((tuple(row[:key_col_count]), row[key_col_count]) for row in rows)
-    return {k: v for k, v in kv if k in keys}
-
-
-def _yaml_dump(obj):
-    return yaml.safe_dump(obj, default_flow_style=False, allow_unicode=True)
-
-
-def _check_entry(expected, got, ignored_keys=()):
-    for key in (expected.keys() | got.keys()).difference(ignored_keys):
-        if expected[key] != got[key]:
-            print(_yaml_dump(expected))
-            print(_yaml_dump(got))
-            raise ValueError('Attempting to overwrite existing entry')
-
-
-def bulk_load(db, sources, table, key_columns, id_column='id',
-              no_existing=False, ignored_columns=()):
-    """Load data into the database
-
-    :param db: The SQLAlchemy session
-    :param sources: A list of dictionaries containing the values to insert
-    :param table: The SQLAlchemy table to operate on
-    :param key_columns: Names of unique-key columns
-    :param id_column: Name of the surrogate primary key column
-    :param no_existing: If true, disallow duplicates of entries already in the DB
-    :param ignored_columns: Columns ignored in duplicate checking
-
-    Returns an ID map: a dictionary of keys (values from columns given by
-    key_columns) to IDs.
-    """
-
-    # Get a dict of key -> source, while checking that sources with duplicate
-    # keys also have duplicate data
-
-    source_dict = {}
-    for source in sources:
-        key = tuple(source[k] for k in key_columns)
-        if key in source_dict:
-            _check_entry(source_dict[key], source, ignored_columns)
-        else:
-            source_dict[key] = source
-    if not source_dict:
+    if not rows:
         return
-    keys = set(source_dict)
 
-    # List of column objects (key + id)
-    col_list = [table.c[k] for k in key_columns] + [table.c[id_column]]
+    row0_set = set(rows[0])
+    if set(key_columns) - row0_set:
+        raise ValueError('key columns not in data')
 
-    def get_whereclause(keys):
-        """WHERE clause that selects all given keys
-        (may give some extra ones)
-        """
-        if len(key_columns) == 1:
-            return table.c[key_columns[0]].in_(k for [k] in keys)
-        else:
-            return and_(table.c[c].in_(set(k[i] for k in keys))
-                        for i, c in enumerate(key_columns))
+    for row in rows:
+        if set(row) != row0_set:
+            raise ValueError('uneven table row')
 
-    # Non-key & non-id column names
-    check_columns = [c for c in sources[0] if c not in key_columns]
+    db.execute(table.insert(), rows)
 
-    # Get existing entries, construct initial ID map
-    sel = select(col_list + [table.c[k] for k in check_columns],
-                 whereclause=get_whereclause(keys))
-    existing_rows = list(db.execute(sel))
-    id_map = _get_idmap(existing_rows, len(key_columns), keys)
+    if id_column is None:
+        return
 
-    # Check existing entries are OK
-    if no_existing and id_map:
-        raise ValueError('Attempting to overwrite existing entry')
-    if check_columns:
-        for row in existing_rows:
-            key = tuple(row[:len(key_columns)])
-            source = source_dict[key]
-            for n, v in zip(check_columns, row[len(key_columns)+1:]):
-                if n not in ignored_columns:
-                    if source[n] != v:
-                        raise ValueError('Attempting to overwrite existing entry')
+    if key_columns == [id_column]:
+        idmap = {row[id_column]:row[id_column] for row in rows}
+    else:
+        col_names = [id_column] + key_columns
+        columns = [table.c[c] for c in col_names]
+        idmap = {tuple(key): i for i, *key in db.execute(select(columns))}
 
-    # Insert the missing rows into the DB; then select them back to read the IDs
-    values = []
-    missing = set()
-    for key, source in source_dict.items():
-        if key not in id_map and key not in missing:
-            values.append(source)
-            missing.add(key)
-    if values:
-        db.execute(table.insert(), values)
-        sel = select(col_list, whereclause=get_whereclause(missing))
-        id_map.update(_get_idmap(db.execute(sel), len(key_columns), keys))
-
-    return id_map
+    result_map.update(idmap)

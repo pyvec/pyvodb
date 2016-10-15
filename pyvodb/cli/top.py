@@ -55,7 +55,7 @@ class Command(click.Command):
 @click.option('-v/-q', '--verbose/--quiet', help="Spew lots of information")
 @click.pass_context
 def cli(ctx, data, verbose, color, format, editor):
-    """Manipulate and query a meetup database.
+    """Query a meetup database.
     """
     ctx.obj['verbose'] = verbose
     if verbose:

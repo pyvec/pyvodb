@@ -58,7 +58,7 @@ def render_event(term, event, today, verbose=False):
     if event.venue.address:
         print(', {}'.format(event.venue.address), end='')
     if event.venue.address:
-        print(', {}'.format(event.venue.city), end='')
+        print(', {}'.format(event.venue.city.name), end='')
     print()
     print('  {v.latitude} N, {v.longitude} E'.format(v=event.venue))
     print('  http://mapy.cz/zakladni?x={v.longitude}&y={v.latitude}&z=17'.format(v=event.venue))
