@@ -39,9 +39,13 @@ class Event(TableBase):
     id = Column(
         Integer, primary_key=True, nullable=False,
         doc=u"An internal numeric ID")
+    series_slug = Column(
+        ForeignKey('series.slug'), nullable=False,
+        doc=u"The series this event belongs to")
     name = Column(
         Unicode(), nullable=False,
-        doc=u"General name of the event")
+        doc=u"General name of the event – often, this is the same as the "
+            u"name of the series")
     number = Column(
         Integer(), nullable=True,
         doc=u"Serial number of the event (if kept track of)")
@@ -63,6 +67,8 @@ class Event(TableBase):
     city_slug = Column(ForeignKey('cities.slug'), nullable=False)
     city = relationship('City', backref=backref('events',
                                                 order_by=desc('date')))
+    series = relationship('Series', backref=backref('events',
+                                                    order_by=desc('date')))
     venue_id = Column(ForeignKey('venues.id'), nullable=True)
     venue = relationship('Venue', backref=backref('events'))
     talks = relationship('Talk', collection_class=ordering_list('index'),
@@ -150,6 +156,20 @@ class City(TableBase):
     _source = Column(
         Unicode(), nullable=True,
         doc=u"File from which the entry was loaded")
+
+
+class Series(TableBase):
+    u"""A series events"""
+    __tablename__ = 'series'
+    slug = Column(
+        Unicode(), primary_key=True,
+        doc=u"Unique identifier for use in URLs")
+    name = Column(
+        Unicode(), nullable=False,
+        doc=u"Name of the series")
+    home_city = Column(
+        ForeignKey(City.slug), nullable=True,
+        doc=u"City this series usually takes place at, if any")
 
 
 class Venue(TableBase):

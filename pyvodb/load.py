@@ -70,6 +70,9 @@ def load_from_dict(db, data):
     if data['meta']['version'] != 2:
         raise ValueError('Can only load version 2')
 
+    if db.get_bind(tables.Event).dialect.name == 'sqlite':
+        db.execute('PRAGMA foreign_keys = ON')
+
     with bulk_inserter(db) as insert:
 
         # Load speakers
@@ -112,10 +115,18 @@ def load_from_dict(db, data):
                 })
 
 
-        # Load events
+        # Load series, their events, and everything underneath
 
-        for series_slug, series in data['series'].items():
-            for event_slug, event in series['events'].items():
+        for series_slug, series_dir in data['series'].items():
+
+            series = series_dir['series']
+            insert(tables.Series, {
+                'slug': series_slug,
+                'name': series['name'],
+                'city_slug': series.get('city'),
+            })
+
+            for event_slug, event in series_dir['events'].items():
                 venue_slug = event.get('venue')
                 city_slug = event['city']
                 if venue_slug:
@@ -131,6 +142,7 @@ def load_from_dict(db, data):
                     'description': event.get('description'),
                     'date': start.date(),
                     'start_time': start.time(),
+                    'series_slug': series_slug,
                     'city_slug': city_slug,
                     'venue_id': venue_id,
                     '_source': event['_source']
