@@ -1,7 +1,8 @@
 import os
+import sys
 import datetime
 import contextlib
-import sys
+import collections
 
 import yaml
 from sqlalchemy import create_engine
@@ -69,18 +70,30 @@ def load_from_dict(db, data):
     if data['meta']['version'] != 2:
         raise ValueError('Can only load version 2')
 
-    # Load cities, and their venues
+    with bulk_inserter(db) as insert:
 
-    with contextlib.ExitStack() as stack:
-        insert_city, city_slugs = stack.enter_context(bulk_loader(
-            db, tables.City, id_column='slug'))
+        # Load speakers
 
-        insert_venue, venue_ids = stack.enter_context(bulk_loader(
-            db, tables.Venue, key_columns=['city_slug', 'slug']))
+        speaker_slugs = set()
+
+        for series_slug, series in data['series'].items():
+            for event_slug, event in series['events'].items():
+                for talk in event.get('talks'):
+                    for speaker in talk.get('speakers', ()):
+                        if speaker not in speaker_slugs:
+                            speaker_slugs.add(speaker)
+                            insert(tables.Speaker, {
+                                'slug': speaker,
+                                'name': speaker,
+                            })
+
+        venue_ids = {}
+
+        # Load cities, and their venues
 
         for city_slug, city in data['cities'].items():
             city_data = city['city']
-            insert_city({
+            insert(tables.City, {
                 'slug': city_slug,
                 'name': city_data['name'],
                 'latitude': city_data['location']['latitude'],
@@ -89,7 +102,7 @@ def load_from_dict(db, data):
             })
 
             for venue_slug, venue in city.get('venues', {}).items():
-                insert_venue({
+                venue_ids[city_slug, venue_slug] = insert(tables.Venue, {
                     'city_slug': city_slug,
                     'slug': venue_slug,
                     'name': venue['name'],
@@ -98,30 +111,8 @@ def load_from_dict(db, data):
                     'longitude': venue['location']['longitude'],
                 })
 
-    # Load speakers
 
-    speaker_slugs = set()
-    with contextlib.ExitStack() as stack:
-        insert, speaker_ids = stack.enter_context(bulk_loader(
-            db, tables.Speaker, id_column='slug'))
-
-        for series_slug, series in data['series'].items():
-            for event_slug, event in series['events'].items():
-                for talk in event.get('talks'):
-                    for speaker in talk.get('speakers', ()):
-                        if speaker not in speaker_slugs:
-                            speaker_slugs.add(speaker)
-                            insert({
-                                'slug': speaker,
-                                'name': speaker,
-                            })
-
-    # Load events
-
-    with contextlib.ExitStack() as stack:
-        insert, event_ids = stack.enter_context(bulk_loader(
-            db, tables.Event,
-            key_columns=['city_slug', 'date', 'start_time']))
+        # Load events
 
         for series_slug, series in data['series'].items():
             for event_slug, event in series['events'].items():
@@ -133,7 +124,7 @@ def load_from_dict(db, data):
                     venue_id = None
 
                 start = make_full_datetime(event['start'])
-                insert({
+                event_id = insert(tables.Event, {
                     'name': event['name'],
                     'number': event.get('number'),
                     'topic': event.get('topic'),
@@ -145,25 +136,8 @@ def load_from_dict(db, data):
                     '_source': event['_source']
                 })
 
-    # Load event talks and links
-
-    with contextlib.ExitStack() as stack:
-        insert_talk, talk_ids = stack.enter_context(bulk_loader(
-            db, tables.Talk,
-            key_columns=['event_id', 'index']))
-
-        insert_event_link, _ids = stack.enter_context(bulk_loader(
-            db, tables.EventLink,
-            key_columns=['event_id', 'index'], id_column=None))
-
-        for series_slug, series in data['series'].items():
-            for event_slug, event in series['events'].items():
-                full_start = make_full_datetime(event['start'])
-                event_key = (event['city'],
-                             full_start.date(), full_start.time())
-                event_id = event_ids[event_key]
                 for i, talk in enumerate(event.get('talks', ())):
-                    insert_talk({
+                    talk_id = insert(tables.Talk, {
                         'event_id': event_id,
                         'index': i,
                         'title': talk['title'],
@@ -171,34 +145,9 @@ def load_from_dict(db, data):
                         'is_lightning': talk.get('is_lightning', False),
                     })
 
-                for i, url in enumerate(event.get('urls', ())):
-                    insert_event_link({
-                        'event_id': event_id,
-                        'index': i,
-                        'url': url,
-                    })
-
-    # Load talk speakers and links
-
-    with contextlib.ExitStack() as stack:
-        insert_talk_speaker, _ids = stack.enter_context(bulk_loader(
-            db, tables.TalkSpeaker,
-            key_columns=['talk_id', 'speaker_slug'], id_column=None))
-        insert_talk_link, _ids = stack.enter_context(bulk_loader(
-            db, tables.TalkLink,
-            key_columns=['talk_id', 'url'], id_column=None))
-
-        for series_slug, series in data['series'].items():
-            for event_slug, event in series['events'].items():
-                for i, talk in enumerate(event.get('talks', ())):
-                    full_start = make_full_datetime(event['start'])
-                    event_key = (event['city'],
-                                 full_start.date(), full_start.time())
-                    event_id = event_ids[event_key]
-                    talk_id = talk_ids[event_id, i]
                     for i, speaker in enumerate(talk.get('speakers', ())):
                         assert speaker in speaker_slugs
-                        insert_talk_speaker({
+                        insert(tables.TalkSpeaker, {
                             'talk_id': talk_id,
                             'index': i,
                             'speaker_slug': speaker,
@@ -208,12 +157,19 @@ def load_from_dict(db, data):
                             *({'talk': u} for u in talk.get('urls', ())),
                             *talk.get('coverage', {})]):
                         for kind, url in link.items():
-                            insert_talk_link({
+                            insert(tables.TalkLink, {
                                 'talk_id': talk_id,
                                 'index': i,
                                 'url': url,
                                 'kind': kind,
                             })
+
+                for i, url in enumerate(event.get('urls', ())):
+                    insert(tables.EventLink, {
+                        'event_id': event_id,
+                        'index': i,
+                        'url': url,
+                    })
 
 
 def make_full_datetime(value):
@@ -227,39 +183,35 @@ def make_full_datetime(value):
 
 
 @contextlib.contextmanager
-def bulk_loader(db, orm_class, key_columns=None, id_column='id'):
-    if key_columns is None:
-        if id_column is None:
-            raise ValueError('no key or id column')
-        key_columns = [id_column]
+def bulk_inserter(db):
+    next_id = {}
+    table_columns = {}
+    table_rows = collections.OrderedDict()
+    need_id = {}
 
-    rows = []
-    result_map = {}
-    table = orm_class.__table__
+    def insert(orm_class, row):
+        table = orm_class.__table__
+        if table in table_columns:
+            if set(row) != table_columns[table]:
+                raise ValueError('uneven table row')
+        else:
+            next_id[table] = 0
+            table_columns[table] = set(row)
+            table_rows[table] = []
+            need_id[table] = ('id' in table.c and table.c['id'].autoincrement)
 
-    yield rows.append, result_map
+        row = dict(row)
+        if need_id[table]:
+            row['id'] = the_id = next_id[table]
+            next_id[table] += 1
+        else:
+            the_id = None
 
-    if not rows:
-        return
+        table_rows[table].append(row)
 
-    row0_set = set(rows[0])
-    if set(key_columns) - row0_set:
-        raise ValueError('key columns not in data')
+        return the_id
 
-    for row in rows:
-        if set(row) != row0_set:
-            raise ValueError('uneven table row')
+    yield insert
 
-    db.execute(table.insert(), rows)
-
-    if id_column is None:
-        return
-
-    if key_columns == [id_column]:
-        idmap = {row[id_column]:row[id_column] for row in rows}
-    else:
-        col_names = [id_column] + key_columns
-        columns = [table.c[c] for c in col_names]
-        idmap = {tuple(key): i for i, *key in db.execute(select(columns))}
-
-    result_map.update(idmap)
+    for table, rows in table_rows.items():
+        db.execute(table.insert(), rows)
