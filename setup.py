@@ -19,11 +19,11 @@ class PyTest(TestCommand):
 
 requires = [
     'blessings >= 1.6, < 2.0',
-    'sqlalchemy >= 1.0, < 2.0',
-    'PyYAML >= 3.11, < 4.0',
-    'unidecode >= 0.04, < 1.0',
-    'python-dateutil >= 2.4.2, <3.0',
-    'click >= 4.1, <5.0',
+    'sqlalchemy >= 1.1, < 2.0',
+    'PyYAML >= 3.12, < 4.0',
+    'unidecode >= 0.4, < 1.0',
+    'python-dateutil >= 2.5, <3.0',
+    'click >= 6.6, <7.0',
     'czech-holidays',
     'blessings >= 1.6, < 2.0',
 ]
