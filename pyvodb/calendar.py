@@ -49,9 +49,11 @@ def get_calendar(db, first_year=None, first_month=None, num_months=3,
             start_date = datetime.datetime.combine(start, datetime.time())
             end_date = datetime.datetime.combine(end+relativedelta(days=1),
                                                  datetime.time())
-            occurences = next_occurrences.between(start_date, end_date, inc=True)
-            for occurence in occurences:
-                next_occurences[occurence.date()].append(series)
+            between = getattr(next_occurrences, 'between', None)
+            if between:
+                occurences = between(start_date, end_date, inc=True)
+                for occurence in occurences:
+                    next_occurences[occurence.date()].append(series)
 
     months = collections.OrderedDict()
     now = start
