@@ -180,7 +180,7 @@ class Series(TableBase):
     recurrence_description_cs = Column(
         Unicode(), nullable=True,
         doc=u"Czech description of the recurrence rule")
-    recurrence_description_cs = Column(
+    recurrence_description_en = Column(
         Unicode(), nullable=True,
         doc=u"English description of the recurrence rule")
 

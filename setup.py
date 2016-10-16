@@ -36,7 +36,7 @@ if sys.version_info < (3, 4):
 
 setup_args = dict(
     name='pyvodb',
-    version='0.3.2',
+    version='0.3.3',
     packages=find_packages(),
     url='https://github.com/pyvec/pyvodb',
 
