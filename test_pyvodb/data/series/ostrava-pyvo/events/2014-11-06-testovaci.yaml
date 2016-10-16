@@ -1,8 +1,9 @@
-city: Ostrava
+city: ostrava
 start: 2014-11-06 19:00:00
 name: Ostravské Pyvo s Rubači
 topic: Testovací
-description: 'Zdá se to téměř neuvěřitelné, ale už je to rok, co se dvojice nadšenců
+description: |
+  Zdá se to téměř neuvěřitelné, ale už je to rok, co se dvojice nadšenců
   z Brna poprvé rozhodla rozšířit pole působnosti Pyva i do našich luhů a hájů.
 
   Velký dík patří jim i Vám všem, kteří to s námi již rok táhnete.
@@ -20,14 +21,8 @@ description: 'Zdá se to téměř neuvěřitelné, ale už je to rok, co se dvoj
   Sejdeme se již tradičně v restauraci V. R. Levský nedaleko Stodolní ulice ve čtvrtek
   6. listopadu v 19:00.
 
-  Těšíme se na Vás.'
-venue:
-  city: Ostrava
-  name: V. R. Levský
-  address: Škroupova 1114/4
-  location:
-    latitude: '49.8362996'
-    longitude: '18.2855466'
+  Těšíme se na Vás.
+venue: vr-levsky
 talks:
 - title: Testování obecně
   speakers:

@@ -1,0 +1,12 @@
+city: praha
+start: 2015-05-20 19:00:00
+name: Pražské PyVo
+number: 50
+topic: anniversary
+venue: na-venecku
+venue-notes: |
+    If you're not sure how to get here, meet us 18:30 at Andel metro station in
+    front of the apple store.
+talks: []
+urls:
+- http://lanyrd.com/2015/praha-pyvo-may/
