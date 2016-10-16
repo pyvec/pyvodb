@@ -2,6 +2,7 @@ import re
 from urllib.parse import urlparse
 import datetime
 import collections
+import itertools
 
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy import UniqueConstraint
@@ -10,9 +11,10 @@ from sqlalchemy.types import Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm.session import Session
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.ext.associationproxy import association_proxy
-from dateutil import tz
+from dateutil import tz, rrule, relativedelta
 
 metadata = MetaData()
 TableBase = declarative_base(metadata=metadata)
@@ -169,12 +171,63 @@ class Series(TableBase):
         Unicode(), nullable=True,
         doc=u"English description")
 
+    recurrence_scheme = Column(
+        Unicode(), nullable=True,
+        doc=u"Basic type of the series' recurrence scheme")
+    recurrence_rule = Column(
+        Unicode(), nullable=True,
+        doc=u"RFC 2445 recurrence rule for regular event dates")
+    recurrence_description_cs = Column(
+        Unicode(), nullable=True,
+        doc=u"Czech description of the recurrence rule")
+    recurrence_description_cs = Column(
+        Unicode(), nullable=True,
+        doc=u"English description of the recurrence rule")
+
     # XXX: Remove this:
     organizer_info = Column(
         Unicode(), nullable=True,
         doc=u"Info about organizers, as JSON.")
 
     home_city = relationship('City', backref=backref('series'))
+
+    def next_occurrences(self, n=None, since=None):
+        """Yield the next planned occurrences after the date "since"
+
+        The `since` argument can be either a date or datetime onject.
+        If not given, it defaults to the date of the last event that's
+        already planned.
+
+        If `n` is given, the result is limited to that many dates;
+        otherwise, infinite results may be generated.
+        Note that less than `n` results may be yielded.
+        """
+        scheme = self.recurrence_scheme
+        if scheme is None:
+            return ()
+
+        if since is None:
+            db = Session.object_session(self)
+            query = db.query(Event)
+            query = query.filter(Event.series_slug == self.slug)
+            query = query.order_by(desc(Event.date))
+            query = query.limit(1)
+            last_planned_event = query.one()
+            since = last_planned_event.date
+
+        start = getattr(since, 'date', since)
+        if scheme == 'monthly':
+            # Monthly events try to have one event per month, so start
+            # on the 1st of next month
+            print(start)
+            start += relativedelta.relativedelta(months=+1)
+            start = start.replace(day=1)
+        else:
+            raise ValueError('Unknown recurrence scheme: ' + scheme)
+        result = rrule.rrulestr(self.recurrence_rule, dtstart=start)
+        if n is not None:
+            result = itertools.islice(result, n)
+        return result
 
 
 class Venue(TableBase):

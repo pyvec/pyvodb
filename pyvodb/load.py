@@ -119,6 +119,16 @@ def load_from_dict(db, data):
         for series_slug, series_dir in data['series'].items():
 
             series = series_dir['series']
+            recurrence = series.get('recurrence')
+            if 'recurrence' in series:
+                recurrence_attrs = {
+                    'recurrence_rule': recurrence['rrule'],
+                    'recurrence_scheme': recurrence['scheme'],
+                    'recurrence_description_cs': recurrence['description']['cs'],
+                    'recurrence_description_en': recurrence['description']['en'],
+                }
+            else:
+                recurrence_attrs = {}
             insert(tables.Series, {
                 'slug': series_slug,
                 'name': series['name'],
@@ -126,6 +136,7 @@ def load_from_dict(db, data):
                 'description_cs': series['description']['cs'],
                 'description_en': series['description']['en'],
                 'organizer_info': json.dumps(series['organizer-info']),
+                **recurrence_attrs,
             })
 
             for event_slug, event in series_dir['events'].items():
