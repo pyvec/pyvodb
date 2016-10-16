@@ -1,7 +1,7 @@
 
 import sys
 
-from setuptools import setup
+from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 
 
@@ -36,8 +36,8 @@ if sys.version_info < (3, 4):
 
 setup_args = dict(
     name='pyvodb',
-    version='0.3',
-    packages=['pyvodb'],
+    version='0.3.1',
+    packages=find_packages(),
     url='https://github.com/pyvec/pyvodb',
 
     description="""Database of Pyvo meetups""",
