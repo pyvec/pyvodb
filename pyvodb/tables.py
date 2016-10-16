@@ -100,15 +100,6 @@ class Event(TableBase):
     day = date_property('day')
 
     def as_dict(self):
-        venue_info = collections.OrderedDict()
-        venue_info['city'] = self.venue.city
-        venue_info['name'] = self.venue.name
-        if self.venue.address is not None:
-            venue_info['address'] = self.venue.address
-        venue_info['location'] = collections.OrderedDict()
-        venue_info['location']['latitude'] = self.venue.latitude
-        venue_info['location']['longitude'] = self.venue.longitude
-
         talks = []
         for talk in self.talks:
             talk_info = collections.OrderedDict()
@@ -123,7 +114,7 @@ class Event(TableBase):
                 talk_info['description'] = talk.description
 
         result = collections.OrderedDict()
-        result['city'] = self.city.name
+        result['city'] = self.city.slug
         result['start'] = datetime.datetime.combine(self.date, self.start_time)
         result['name'] = self.name
         if self.number is not None:
@@ -132,7 +123,8 @@ class Event(TableBase):
             result['topic'] = self.topic
         if self.description is not None:
             result['description'] = self.description
-        result['venue'] = venue_info
+        if self.venue:
+            result['venue'] = self.venue.slug
         result['talks'] = talks
         result['urls'] = [l.url for l in self.links]
         return result

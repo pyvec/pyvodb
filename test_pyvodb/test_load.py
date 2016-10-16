@@ -1,7 +1,8 @@
 import pytest
 
-from pyvodb.load import get_db, load_from_directory, yield_filenames
-from pyvodb.load import load_from_file
+from sqlalchemy.exc import IntegrityError
+
+from pyvodb.load import get_db, load_from_directory
 from pyvodb.tables import Event, City, Venue
 
 @pytest.fixture(scope='module')
@@ -17,15 +18,8 @@ def test_load(db):
     assert db.query(Event).first().name
 
 def test_load_twice(db, data_directory):
-    with pytest.raises(ValueError):
+    with pytest.raises((ValueError, IntegrityError)):
         load_from_directory(db, data_directory)
-
-def test_load_piecewise(empty_db, data_directory):
-    for filename in yield_filenames(data_directory):
-        load_from_file(empty_db, filename)
-    assert empty_db.query(Event).first().name
-
-    test_talk_speakers(empty_db)
 
 def test_title_3part(db):
     """Test title with name, number, and topic"""
@@ -143,7 +137,7 @@ def test_venues(db):
     """Test that a venue has events"""
     query = db.query(Venue)
     query = query.filter(Venue.name == 'Na Věnečku')
-    query = query.filter(Venue.city == 'Prague')
+    query = query.filter(Venue.city_slug == 'praha')
     venue = query.one()
     assert venue.events
     assert any(e.name == 'Pražské PyVo' for e in venue.events)

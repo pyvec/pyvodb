@@ -54,9 +54,7 @@ def dict_from_directory(directory, root):
 
 
 def load_from_directory(db, directory):
-    print('Reading YAML', file=sys.stderr)
     data = dict_from_directory('.', directory)
-    print('Loading DB', file=sys.stderr)
     load_from_dict(db, data)
 
 

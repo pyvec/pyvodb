@@ -95,25 +95,27 @@ def test_show_now(run, get_yaml_data):
 
 def test_show_no_upcoming(run, get_yaml_data):
     result = run('show', 'brno', now='2099-01-01 00:00:00')
-    assert result.exit_code == 'No such meetup'  # SystemExit('No such meetup')
+    assert result.exit_code != 0
+    assert result.output.strip() == 'No such meetup'
 
 
 @pytest.mark.parametrize(['filename', 'args'], [
-    ['brno/2015-02-26*.yaml', ('brno', )],
-    ['ostrava/2013-12-04*.yaml', ('ostrava', 'p1')],
-    ['ostrava/2013-11-07*.yaml', ('ostrava', 'p2')],
-    ['ostrava/2014-08-07*.yaml', ('ostrava', '+1')],
-    ['ostrava/2014-10-02*.yaml', ('ostrava', '+2')],
-    ['ostrava/2014-11-06*.yaml', ('ostrava', '11')],
-    ['ostrava/2013-11-07*.yaml', ('ostrava', '13-11')],
-    ['ostrava/2013-11-07*.yaml', ('ostrava', '2013-11')],
-    ['ostrava/2013-11-07*.yaml', ('ostrava', '13-11-07')],
-    ['ostrava/2013-11-07*.yaml', ('ostrava', '2013-11-07')],
+    ['series/brno-pyvo/events//2015-02-26*.yaml', ('brno', )],
+    ['series/ostrava-pyvo/events/2013-12-04*.yaml', ('ostrava', 'p1')],
+    ['series/ostrava-pyvo/events//2013-11-07*.yaml', ('ostrava', 'p2')],
+    ['series/ostrava-pyvo/events//2014-08-07*.yaml', ('ostrava', '+1')],
+    ['series/ostrava-pyvo/events//2014-10-02*.yaml', ('ostrava', '+2')],
+    ['series/ostrava-pyvo/events//2014-11-06*.yaml', ('ostrava', '11')],
+    ['series/ostrava-pyvo/events//2013-11-07*.yaml', ('ostrava', '13-11')],
+    ['series/ostrava-pyvo/events//2013-11-07*.yaml', ('ostrava', '2013-11')],
+    ['series/ostrava-pyvo/events//2013-11-07*.yaml', ('ostrava', '13-11-07')],
+    ['series/ostrava-pyvo/events//2013-11-07*.yaml', ('ostrava', '2013-11-07')],
 ])
 def test_show_event(run, get_yaml_data, args, filename):
     result = run('--yaml', 'show',  *args)
     assert result.exit_code == 0
-    assert result.output == get_yaml_data(filename)
+    ysl = yaml.safe_load
+    assert ysl(result.output) == ysl(get_yaml_data(filename))
 
 
 @pytest.mark.parametrize(['message', 'args'], [
@@ -123,7 +125,8 @@ def test_show_event(run, get_yaml_data, args, filename):
 ])
 def test_show_event_negative(run, get_yaml_data, args, message):
     result = run('show',  *args)
-    assert result.exit_code == message
+    assert result.exit_code != 0
+    assert result.output.strip() == message
 
 
 def test_calendar(run):
@@ -262,103 +265,3 @@ def test_calendar_yaml(run):
     assert result.exit_code == 0
     output = yaml.safe_load(result.output)
     assert output[0]
-
-
-def test_edit_noninteractive(run, data_directory, tmpdir):
-    p = tmpdir.mkdir("brno").join("_f.yaml")
-    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
-        p.write(f.read())
-    db = get_db(str(tmpdir))
-    with open(os.path.join(data_directory, 'praha', '2011-01-17.yaml')) as f:
-        data = f.read()
-    result = run('edit', 'brno', '2013-05-30',
-                 datadir=str(tmpdir), stdin_text=data, db=db)
-    assert result.exit_code == 0
-    assert result.output == ''
-
-    assert tmpdir.join('praha/2011-01-17.yaml').check()
-    assert not tmpdir.join('brno/2013-05-30-gui.yaml').check()
-    assert tmpdir.join('praha/2011-01-17.yaml').read() == data
-
-    event = db.query(tables.Event).one()
-    assert str(event.date) == '2011-01-17'
-    assert event.city.name == 'Praha'
-
-
-def make_fake_input(inputs):
-    def fake_input(prompt):
-        current_input = inputs.pop(0)
-        print(prompt + current_input)
-        return current_input
-    return fake_input
-
-
-def test_edit_interactive(run, data_directory, tmpdir, monkeypatch):
-    monkeypatch.setattr(builtins, 'input', make_fake_input(['y']))
-    p = tmpdir.mkdir("brno").join("_f.yaml")
-    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
-        p.write(f.read())
-    db = get_db(str(tmpdir))
-    result = run('--editor', 'sed -i 1s/.$//',
-                 'edit', 'brno', '2013-05-30', '--interactive',
-                 datadir=str(tmpdir), db=db)
-
-    assert result.exit_code == 0
-
-    event = db.query(tables.Event).one()
-    assert event.city.name == 'Brn'
-
-
-@pytest.mark.parametrize(['editor', 'inputs', 'result_cityname', 'expected'], [
-    # editor removes last char in first line; Edit, show Diff, Yes (save)
-    ('sed -i 1s/.$//', ('e', 'd', 'y'), 'Br', 'edit1.session'),
-    # editor removes first line; Traceback, show Diff, Quit
-    ('sed -i 1s/.*//', ('t', 'd', 'q'), 'Brno', 'edit2.session'),
-])
-def test_edit_interactive_dialog(run, data_directory, tmpdir, monkeypatch,
-                                 editor, inputs, result_cityname, expected):
-    """Test interactive commands for editor"""
-    monkeypatch.setattr(builtins, 'input', make_fake_input(list(inputs)))
-    p = tmpdir.mkdir("brno").join("_f.yaml")
-    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
-        p.write(f.read())
-    db = get_db(str(tmpdir))
-    result = run('--editor', editor,
-                 'edit', 'brno', '2013-05-30', '--interactive',
-                 datadir=str(tmpdir), db=db)
-
-    assert result.exit_code == 0
-
-    event = db.query(tables.Event).one()
-    assert event.city.name == result_cityname
-
-    expected_filename = os.path.join(os.path.dirname(__file__),
-                                     'expected', expected)
-    with open(expected_filename) as f:
-        expected = f.read()
-
-    f = pyvodb_cli_module.edit.__file__
-    output = result.output
-    output = re.sub(r'File "{}", line \d+,'.format(re.escape(f)),
-                        'File ...,',
-                        output)
-
-    assert output == expected
-
-
-def test_rm(run, data_directory, tmpdir, monkeypatch):
-    monkeypatch.setattr(builtins, 'input', make_fake_input(['y']))
-    p = tmpdir.mkdir("brno").join("_f.yaml")
-    with open(os.path.join(data_directory, 'brno', '2013-05-30-gui.yaml')) as f:
-        p.write(f.read())
-    db = get_db(str(tmpdir))
-    result = run('rm', 'brno', '2013-05-30',
-                 datadir=str(tmpdir), db=db)
-
-    assert result.exit_code == 0
-    assert result.output == ''
-
-    assert not p.check()
-
-    with pytest.raises(NoResultFound):
-        db.query(tables.Event).one()
