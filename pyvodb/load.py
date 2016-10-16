@@ -244,4 +244,5 @@ def bulk_inserter(db):
     yield insert
 
     for table, rows in table_rows.items():
+        db.execute(table.delete())
         db.execute(table.insert(), rows)
