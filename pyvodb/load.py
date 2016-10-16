@@ -158,7 +158,7 @@ def load_from_dict(db, data):
                         'index': i,
                         'title': talk['title'],
                         'description': talk.get('description'),
-                        'is_lightning': talk.get('is_lightning', False),
+                        'is_lightning': talk.get('lightning', False),
                     })
 
                     for i, speaker in enumerate(talk.get('speakers', ())):
