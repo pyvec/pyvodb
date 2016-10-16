@@ -43,6 +43,8 @@ def get_calendar(db, first_year=None, first_month=None, num_months=3,
         query = db.query(tables.Series)
         for series_slug in series_slugs:
             series = query.get(series_slug)
+            if not series:
+                continue
             next_occurrences = series.next_occurrences()
             start_date = datetime.datetime.combine(start, datetime.time())
             end_date = datetime.datetime.combine(end+relativedelta(days=1),
