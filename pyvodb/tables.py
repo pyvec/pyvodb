@@ -167,9 +167,22 @@ class Series(TableBase):
     name = Column(
         Unicode(), nullable=False,
         doc=u"Name of the series")
-    home_city = Column(
+    home_city_slug = Column(
         ForeignKey(City.slug), nullable=True,
         doc=u"City this series usually takes place at, if any")
+    description_cs = Column(
+        Unicode(), nullable=True,
+        doc=u"Czech description")
+    description_en = Column(
+        Unicode(), nullable=True,
+        doc=u"English description")
+
+    # XXX: Remove this:
+    organizer_info = Column(
+        Unicode(), nullable=True,
+        doc=u"Info about organizers, as JSON.")
+
+    home_city = relationship('City', backref=backref('series'))
 
 
 class Venue(TableBase):

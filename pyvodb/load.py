@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import datetime
 import contextlib
 import collections
@@ -123,7 +124,10 @@ def load_from_dict(db, data):
             insert(tables.Series, {
                 'slug': series_slug,
                 'name': series['name'],
-                'city_slug': series.get('city'),
+                'home_city_slug': series.get('city'),
+                'description_cs': series['description']['cs'],
+                'description_en': series['description']['en'],
+                'organizer_info': json.dumps(series['organizer-info']),
             })
 
             for event_slug, event in series_dir['events'].items():
