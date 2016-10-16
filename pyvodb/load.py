@@ -69,8 +69,13 @@ def load_from_dict(db, data):
     if data['meta']['version'] != 2:
         raise ValueError('Can only load version 2')
 
-    if db.get_bind(tables.Event).dialect.name == 'sqlite':
-        db.execute('PRAGMA foreign_keys = ON')
+    try:
+        bind = db.get_bind(tables.Event)
+    except (ValueError, AttributeError):
+        pass
+    else:
+        if bind.dialect.name == 'sqlite':
+            db.execute('PRAGMA foreign_keys = ON')
 
     with bulk_inserter(db) as insert:
 
