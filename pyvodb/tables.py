@@ -219,7 +219,6 @@ class Series(TableBase):
         if scheme == 'monthly':
             # Monthly events try to have one event per month, so start
             # on the 1st of next month
-            print(start)
             start += relativedelta.relativedelta(months=+1)
             start = start.replace(day=1)
         else:
