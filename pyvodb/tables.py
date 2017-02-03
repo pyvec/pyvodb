@@ -97,6 +97,11 @@ class Event(TableBase):
             time = self.start_time.replace(tzinfo=CET)
         return datetime.datetime.combine(self.date, time)
 
+    @property
+    def slug(self):
+        """Identifier for use in URLs. Unique within the series"""
+        return self.date.strftime('%Y-%m')
+
     year = date_property('year')
     month = date_property('month')
     day = date_property('day')
