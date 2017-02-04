@@ -158,6 +158,9 @@ def load_from_dict(db, data):
                     venue_id = None
 
                 start = make_full_datetime(event['start'])
+                end = event.get('end')
+                if end is None:
+                    end = start.replace(hour=23, minute=59, second=59)
                 event_id = insert(tables.Event, {
                     'name': event['name'],
                     'number': event.get('number'),
@@ -165,6 +168,8 @@ def load_from_dict(db, data):
                     'description': event.get('description'),
                     'date': start.date(),
                     'start_time': start.time(),
+                    'end': end,
+                    'all_day': event.get('all_day', False),
                     'series_slug': series_slug,
                     'city_slug': city_slug,
                     'venue_id': venue_id,

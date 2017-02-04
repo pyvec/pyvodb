@@ -7,7 +7,7 @@ import itertools
 from sqlalchemy import Column, ForeignKey, MetaData, extract, desc
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.types import Boolean, Integer, Unicode, UnicodeText, Date, Time
-from sqlalchemy.types import Enum
+from sqlalchemy.types import Enum, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
@@ -63,6 +63,12 @@ class Event(TableBase):
     start_time = Column(
         Time(),
         doc=u"The start time")
+    all_day = Column(
+        Boolean(), nullable=False, default=False,
+        doc=u"True if the event lasts all day")
+    end = Column(
+        DateTime(),
+        doc=u"The end date and time")
     _source = Column(
         Unicode(), nullable=True,
         doc=u"File from which the entry was loaded")
@@ -105,6 +111,11 @@ class Event(TableBase):
     year = date_property('year')
     month = date_property('month')
     day = date_property('day')
+
+    @property
+    def one_day(self):
+        """Is true if the event only spans one day"""
+        return self.end.date() == self.date
 
     def as_dict(self):
         talks = []
