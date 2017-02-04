@@ -113,7 +113,7 @@ def load_from_dict(db, data):
                     'city_slug': city_slug,
                     'slug': venue_slug,
                     'name': venue['name'],
-                    'address': venue['address'],
+                    'address': venue.get('address'),
                     'latitude': venue['location']['latitude'],
                     'longitude': venue['location']['longitude'],
                 })
@@ -133,14 +133,19 @@ def load_from_dict(db, data):
                     'recurrence_description_en': recurrence['description']['en'],
                 }
             else:
-                recurrence_attrs = {}
+                recurrence_attrs = {
+                    'recurrence_rule': None,
+                    'recurrence_scheme': None,
+                    'recurrence_description_cs': None,
+                    'recurrence_description_en': None,
+                }
             insert(tables.Series, {
                 'slug': series_slug,
                 'name': series['name'],
                 'home_city_slug': series.get('city'),
                 'description_cs': series['description']['cs'],
                 'description_en': series['description']['en'],
-                'organizer_info': json.dumps(series['organizer-info']),
+                'organizer_info': json.dumps(series.get('organizer-info', ())),
                 **recurrence_attrs,
             })
 
