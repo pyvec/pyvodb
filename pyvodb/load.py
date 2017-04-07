@@ -34,12 +34,12 @@ def get_db(directory, engine=None):
     return db
 
 
-def dict_from_directory(directory, root):
+def dict_from_directory(directory, root, ignored_files=()):
     data = {}
     for filename in os.listdir(os.path.join(root, directory)):
         fullname = os.path.join(directory, filename)
         absname = os.path.join(root, fullname)
-        if filename in ('.git', 'README') or filename.startswith('.'):
+        if filename in ignored_files or filename.startswith('.'):
             pass
         elif filename.endswith('.yaml'):
             with open(absname) as f:
@@ -54,7 +54,8 @@ def dict_from_directory(directory, root):
 
 
 def load_from_directory(db, directory):
-    data = dict_from_directory('.', directory)
+    data = dict_from_directory(
+        '.', directory, ignored_files=['.git', 'README', 'tests'])
     load_from_dict(db, data)
 
 
