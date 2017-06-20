@@ -3,11 +3,14 @@ import collections
 
 from czech_holidays import Holidays
 from dateutil.relativedelta import relativedelta
+from dateutil import tz
 
 from pyvodb import tables
 
 DAY = datetime.timedelta(days=1)
 WEEK = DAY * 7
+
+CET = tz.gettz('Europe/Prague')
 
 MONTH_NAMES = ('? January February March April May June July August September '
     'October November December').split()
@@ -46,9 +49,10 @@ def get_calendar(db, first_year=None, first_month=None, num_months=3,
             if not series:
                 continue
             next_occurrences = series.next_occurrences()
-            start_date = datetime.datetime.combine(start, datetime.time())
+            zero_time = datetime.time(tzinfo=CET)
+            start_date = datetime.datetime.combine(start, zero_time)
             end_date = datetime.datetime.combine(end+relativedelta(days=1),
-                                                 datetime.time())
+                                                 zero_time)
             between = getattr(next_occurrences, 'between', None)
             if between:
                 occurences = between(start_date, end_date, inc=True)
