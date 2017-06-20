@@ -238,7 +238,8 @@ class Series(TableBase):
             start += relativedelta.relativedelta(months=+1)
             start = start.replace(day=1)
         else:
-            raise ValueError('Unknown recurrence scheme: ' + scheme)
+            # Otherwise, start on the next day.
+            start += relativedelta.relativedelta(days=+1)
         result = rrule.rrulestr(self.recurrence_rule, dtstart=start)
         if n is not None:
             result = itertools.islice(result, n)
