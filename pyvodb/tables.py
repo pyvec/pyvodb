@@ -240,6 +240,7 @@ class Series(TableBase):
         else:
             # Otherwise, start on the next day.
             start += relativedelta.relativedelta(days=+1)
+        start = datetime.datetime.combine(start, datetime.time(tzinfo=CET))
         result = rrule.rrulestr(self.recurrence_rule, dtstart=start)
         if n is not None:
             result = itertools.islice(result, n)
