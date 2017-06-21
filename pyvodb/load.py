@@ -9,6 +9,7 @@ import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.expression import select
+from dateutil import rrule
 
 from . import tables
 
@@ -133,9 +134,11 @@ def load_from_dict(db, data, metadata):
 
             series = series_dir['series']
             recurrence = series.get('recurrence')
-            if 'recurrence' in series:
+            if recurrence:
+                rrule_str = recurrence['rrule']
+                rrule.rrulestr(rrule_str)  # check rrule syntax
                 recurrence_attrs = {
-                    'recurrence_rule': recurrence['rrule'],
+                    'recurrence_rule': rrule_str,
                     'recurrence_scheme': recurrence['scheme'],
                     'recurrence_description_cs': recurrence['description']['cs'],
                     'recurrence_description_en': recurrence['description']['en'],
