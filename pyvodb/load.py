@@ -53,13 +53,22 @@ def dict_from_directory(directory, root, ignored_files=()):
     return data
 
 
+def load_meta_file(directory):
+        metafile = os.path.join(directory, 'meta.yaml')
+        with open(metafile) as f:
+            info = yaml.load(f, Loader=YAML_SAFE_LOADER)
+        info['ignored_files'].append('meta.yaml')
+        return info
+
+
 def load_from_directory(db, directory):
+    metadata = load_meta_file(directory)
     data = dict_from_directory(
-        '.', directory, ignored_files=['.git', 'README', 'tests'])
-    load_from_dict(db, data)
+        '.', directory, ignored_files=metadata['ignored_files'])
+    load_from_dict(db, data, metadata)
 
 
-def load_from_dict(db, data):
+def load_from_dict(db, data, metadata):
     """Load data from a dict (as loaded from directory of YAMLs) into database
     """
     # The ORM overhead is too high for this kind of bulk load,
@@ -67,7 +76,7 @@ def load_from_dict(db, data):
     # This tries to do minimize the number of SQL commands by loading entire
     # tables at once
 
-    if data['meta']['version'] != 2:
+    if metadata['version'] != 2:
         raise ValueError('Can only load version 2')
 
     try:
