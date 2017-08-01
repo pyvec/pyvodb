@@ -42,8 +42,7 @@ def dict_from_directory(directory, root, ignored_files=()):
         if filename in ignored_files or filename.startswith('.'):
             pass
         elif filename.endswith('.yaml'):
-            with open(absname) as f:
-                info = yaml.load(f, Loader=YAML_SAFE_LOADER)
+            info = load_yaml_file(absname)
             info['_source'] = fullname
             data[filename[:-5]] = info
         elif os.path.isdir(absname):
@@ -53,15 +52,13 @@ def dict_from_directory(directory, root, ignored_files=()):
     return data
 
 
-def load_meta_file(directory):
-        metafile = os.path.join(directory, 'meta.yaml')
-        with open(metafile) as f:
-            info = yaml.load(f, Loader=YAML_SAFE_LOADER)
-        return info
+def load_yaml_file(filename):
+    with open(filename) as f:
+        return yaml.load(f, Loader=YAML_SAFE_LOADER)
 
 
 def load_from_directory(db, directory):
-    metadata = load_meta_file(directory)
+    metadata = load_yaml_file(os.path.join(directory, 'meta.yaml'))
     data = dict_from_directory(
         '.', directory,
         ignored_files=metadata.get('ignored_files',
