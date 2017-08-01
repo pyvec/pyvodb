@@ -57,14 +57,15 @@ def load_meta_file(directory):
         metafile = os.path.join(directory, 'meta.yaml')
         with open(metafile) as f:
             info = yaml.load(f, Loader=YAML_SAFE_LOADER)
-        info['ignored_files'].append('meta.yaml')
         return info
 
 
 def load_from_directory(db, directory):
     metadata = load_meta_file(directory)
     data = dict_from_directory(
-        '.', directory, ignored_files=metadata['ignored_files'])
+        '.', directory,
+        ignored_files=metadata.get('ignored_files',
+                                   ['.git', 'README', 'tests']))
     load_from_dict(db, data, metadata)
 
 
