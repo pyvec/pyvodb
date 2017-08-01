@@ -5,10 +5,6 @@ from sqlalchemy.exc import IntegrityError
 from pyvodb.load import get_db, load_from_directory
 from pyvodb.tables import Event, City, Venue
 
-@pytest.fixture(scope='module')
-def db(data_directory):
-    return get_db(data_directory)
-
 @pytest.fixture
 def empty_db(data_directory):
     return get_db(None)

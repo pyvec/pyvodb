@@ -3,6 +3,8 @@ import glob
 
 import pytest
 
+from pyvodb.load import get_db
+
 @pytest.fixture(scope='module')
 def data_directory():
     return os.path.join(os.path.dirname(__file__), 'data')
@@ -14,3 +16,7 @@ def get_yaml_data(data_directory):
         with open(filename) as f:
             return f.read()
     return _get_yaml_data
+
+@pytest.fixture(scope='module')
+def db(data_directory):
+    return get_db(data_directory)

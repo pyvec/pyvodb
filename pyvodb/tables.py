@@ -222,24 +222,32 @@ class Series(TableBase):
         if scheme is None:
             return ()
 
+        db = Session.object_session(self)
+        query = db.query(Event)
+        query = query.filter(Event.series_slug == self.slug)
+        query = query.order_by(desc(Event.date))
+        query = query.limit(1)
+        last_planned_event = query.one_or_none()
+
         if since is None:
-            db = Session.object_session(self)
-            query = db.query(Event)
-            query = query.filter(Event.series_slug == self.slug)
-            query = query.order_by(desc(Event.date))
-            query = query.limit(1)
             last_planned_event = query.one()
+            since = last_planned_event.date
+        elif since < last_planned_event.date:
             since = last_planned_event.date
 
         start = getattr(since, 'date', since)
-        if scheme == 'monthly':
-            # Monthly events try to have one event per month, so start
-            # on the 1st of next month
+
+        start += relativedelta.relativedelta(days=+1)
+
+        if (scheme == 'monthly'
+                and last_planned_event
+                and last_planned_event.date.year == start.year
+                and last_planned_event.date.month == start.month):
+            # Monthly events try to have one event per month, so exclude
+            # the current month if there was already a meetup
             start += relativedelta.relativedelta(months=+1)
             start = start.replace(day=1)
-        else:
-            # Otherwise, start on the next day.
-            start += relativedelta.relativedelta(days=+1)
+
         start = datetime.datetime.combine(start, datetime.time(tzinfo=CET))
         result = rrule.rrulestr(self.recurrence_rule, dtstart=start)
         if n is not None:
