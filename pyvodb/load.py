@@ -54,8 +54,11 @@ def dict_from_directory(directory, root, ignored_files=()):
 
 
 def load_yaml_file(filename):
-    with open(filename) as f:
-        return yaml.load(f, Loader=YAML_SAFE_LOADER)
+    try:
+        with open(filename) as f:
+            return yaml.load(f, Loader=YAML_SAFE_LOADER)
+    except Exception as e:
+        raise Exception('Failed to load file {}: {}'.format(filename, e)) from e
 
 
 def load_from_directory(db, directory):
