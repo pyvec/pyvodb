@@ -280,6 +280,9 @@ class Venue(TableBase):
     slug = Column(
         Unicode(), nullable=False,
         doc=u"Identifier for use in URLs")
+    note = Column(
+        Unicode(), nullable=True,
+        doc=u"Note about the venue, e.g. directions to get there")
 
     city = relationship('City', backref=backref('venues'))
 

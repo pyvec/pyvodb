@@ -128,6 +128,7 @@ def load_from_dict(db, data, metadata):
                     'address': venue.get('address'),
                     'latitude': venue['location']['latitude'],
                     'longitude': venue['location']['longitude'],
+                    'note': venue.get('note'),
                 })
 
 
