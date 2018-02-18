@@ -21,7 +21,12 @@ TableBase = declarative_base(metadata=metadata)
 
 CET = tz.gettz('Europe/Prague')
 
-YOUTUBE_RE = re.compile('https?://www.youtube.com/watch\?v=([-0-9a-zA-Z_]+)')
+YOUTUBE_RE = re.compile(r'''(?x)https?://
+                        (?:
+                            (?:www\.youtube\.com/watch\?v=)|
+                            (?:youtu\.be/)
+                        )
+                        ([-0-9a-zA-Z_]+)''')
 
 
 def date_property(name):

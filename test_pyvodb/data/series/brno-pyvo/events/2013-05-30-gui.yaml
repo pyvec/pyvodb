@@ -11,6 +11,7 @@ talks:
   - http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdm/
   coverage:
   - video: http://www.youtube.com/watch?v=HDmCGUKfe7Y
+  - video: https://youtu.be/HDmCGUKfe7Y
 - title: PySide & Qt
   speakers:
   - Petr Viktorin

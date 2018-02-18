@@ -213,6 +213,7 @@ def test_talk_links(db):
     assert {s.kind: s.url for s in talk.links} == {
         'talk': 'http://lanyrd.com/2013/brnenske-pyvo-brug-kvetnove/schxdm/',
         'video': 'http://www.youtube.com/watch?v=HDmCGUKfe7Y',
+        'video': 'https://youtu.be/HDmCGUKfe7Y',
     }
 
 def test_talk_youtube_id(db):
@@ -230,7 +231,7 @@ def test_talk_link_youtube_id(db):
     query = query.filter(Event.day == 30)
     event = query.one()
     talk = event.talks[0]
-    assert [s.youtube_id for s in talk.links] == [None, 'HDmCGUKfe7Y']
+    assert [s.youtube_id for s in talk.links] == [None, 'HDmCGUKfe7Y', 'HDmCGUKfe7Y']
 
 def test_talk_description(db):
     query = db.query(Event)
