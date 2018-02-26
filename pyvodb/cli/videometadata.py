@@ -1,15 +1,21 @@
 import os.path
 from collections import OrderedDict
-import yaml
 import click
 
 from slugify import slugify
 from pyvodb.cli.top import cli
 from pyvodb.cli import cliutil
+from pyvodb.dumpers import yaml_dump
 
 
-yaml.SafeDumper.add_representer(OrderedDict,
-    lambda dumper, value: dumper.represent_dict(value.items()))
+def cfgdump(path, config):
+    """Create output directory path and output there the config.yaml file."""
+    dump = yaml_dump(config)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    with open(os.path.join(path, 'config.yaml'), 'w') as outf:
+        outf.write(dump)
+    print(dump)
 
 
 @cli.command()
@@ -38,34 +44,30 @@ def videometadata(ctx, city, date, outpath):
     cliutil.handle_raw_output(ctx, data)
 
     evdir = "{}-{}".format(event.city.name, event.slug)
+
+    config = OrderedDict()
+    config['speaker'] = ''
+    config['title'] = ''
+    config['lightning'] = True
+    config['speaker_only'] = False
+    config['widescreen'] = False
+    config['speaker_vid'] = "*.MTS"
+    config['screen_vid'] = "*.ts"
+    config['event'] = event.name
+    if event.number:
+        config['event'] += " #{}".format(event.number)
+    config['date'] = event.date.strftime("%Y-%m-%d")
+    config['url'] = "https://pyvo.cz/{}/{}/".format(event.series_slug,
+                                                    event.slug)
+
     print(evdir)
-    print()
+    cfgdump(os.path.join(outpath, evdir), config)
 
     if event.talks:
-        talknum = 1
-        for talk in event.talks:
-            config = OrderedDict()
+        for talknum, talk in enumerate(event.talks, start=1):
             config['speaker'] = ', '.join(s.name for s in talk.speakers)
             config['title'] = talk.title
             config['lightning'] = talk.is_lightning
-            config['speaker_only'] = False
-            config['widescreen'] = False
-            config['speaker_vid'] = "*.MTS"
-            config['screen_vid'] = "*.ts"
-            config['event'] = event.name
-            if event.number:
-                config['event'] += " #{}".format(event.number)
-            config['date'] = event.date.strftime("%Y-%m-%d")
-            config['url'] = "https://pyvo.cz/{}/{}/".format(event.series_slug,
-                                                            event.slug)
-            confyaml = yaml.safe_dump(config, default_flow_style=False,
-                                      allow_unicode=True)
             talkdir = "{:02d}-{}".format(talknum, slugify(talk.title))
             print(talkdir)
-            print(confyaml)
-            talknum += 1
-            p = os.path.join(outpath, evdir, talkdir)
-            if not os.path.exists(p):
-                os.makedirs(p)
-            with open(os.path.join(p, 'config.yaml'), 'w') as outf:
-                outf.write(confyaml)
+            cfgdump(os.path.join(outpath, evdir, talkdir), config)
