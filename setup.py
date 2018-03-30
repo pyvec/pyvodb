@@ -25,7 +25,7 @@ requires = [
     'python-dateutil >= 2.5, <3.0',
     'click >= 6.6, <7.0',
     'czech-holidays',
-    'blessings >= 1.6, < 2.0',
+    'awesome-slugify',
 ]
 
 tests_require = ['pytest']
