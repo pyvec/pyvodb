@@ -3,6 +3,7 @@ language: python
 python:
   - "3.5"
   - "3.6"
+  - "3.7"
   - "nightly"
 
 matrix:
@@ -13,6 +14,6 @@ install:
   - pip install -e.
   - pip install pytest
 
-script: py.test
+script: pytest
 
 sudo: false

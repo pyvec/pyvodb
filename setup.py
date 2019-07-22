@@ -19,13 +19,12 @@ class PyTest(TestCommand):
 
 requires = [
     'blessings >= 1.6, < 2.0',
-    'sqlalchemy >= 1.1, < 2.0',
-    'PyYAML >= 3.12, < 4.0',
-    'unidecode >= 0.4, < 1.0',
-    'python-dateutil >= 2.5, <3.0',
-    'click >= 6.6, <7.0',
+    'sqlalchemy >= 1.3, < 2.0',
+    'PyYAML >= 5.1, < 6.0',
+    'python-dateutil >= 2.8, <3.0',
+    'click >= 6.7, <7.0',
     'czech-holidays',
-    'awesome-slugify',
+    'python-slugify',
 ]
 
 tests_require = ['pytest']
@@ -36,7 +35,7 @@ if sys.version_info < (3, 4):
 
 setup_args = dict(
     name='pyvodb',
-    version='0.3.10',
+    version='1.0',
     packages=find_packages(),
     url='https://github.com/pyvec/pyvodb',
 
@@ -51,6 +50,8 @@ setup_args = dict(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 
     install_requires=requires,
