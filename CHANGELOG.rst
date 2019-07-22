@@ -1,3 +1,9 @@
+## 1.0 (2019-07-22)
+
+* Release with updated dependencies
+* Add videometadata exporter
+* Use better regexp for YouTube video id
+
 ## 0.3 (2016-10-16)
 
 * Removed CLI editing support; the database is now load-only. This simplifies
